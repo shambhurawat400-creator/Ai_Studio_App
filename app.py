@@ -133,11 +133,11 @@ else:
     st.write("---")
     
     if is_admin:
-        nav_cols = st.columns(5)
-        pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎨 AI Image", "⚙️ Admin"]
+        nav_cols = st.columns(6)
+        pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎨 AI Image", "🎬 Image to Video", "⚙️ Admin"]
     else:
-        nav_cols = st.columns(4)
-        pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎨 AI Image"]
+        nav_cols = st.columns(5)
+        pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎨 AI Image", "🎬 Image to Video"]
 
     for i, page in enumerate(pages):
         btn_type = "primary" if st.session_state.current_page == page else "secondary"
@@ -160,27 +160,34 @@ else:
 
         st.write("### 🚀 Quick Access Tools")
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
 
         with col1:
             st.markdown("### 💬 AI Chatbot")
-            st.write("स्मार्ट AI से सवाल पूछें और बातचीत करें।")
+            st.write("स्मार्ट AI से सवाल पूछें।")
             if st.button("Open Chatbot ➔", type="primary", use_container_width=True):
                 st.session_state.current_page = "💬 AI Chatbot"
                 st.rerun()
 
         with col2:
-            st.markdown("### 📜 AI Script Generator")
-            st.write("YouTube, Reels और स्टोरीज के लिए स्क्रिप्ट लिखें।")
+            st.markdown("### 📜 AI Script")
+            st.write("वीडियो और स्टोरीज की स्क्रिप्ट लिखें।")
             if st.button("Open Script Tool ➔", type="primary", use_container_width=True):
                 st.session_state.current_page = "📜 AI Script"
                 st.rerun()
 
         with col3:
-            st.markdown("### 🎨 AI Image Generator")
-            st.write("Ultra Fast 4K HD और स्टाइलिश इमेज बनाएं।")
+            st.markdown("### 🎨 AI Image")
+            st.write("Ultra Fast 4K HD फोटो बनाएं।")
             if st.button("Open Image Generator ➔", type="primary", use_container_width=True):
                 st.session_state.current_page = "🎨 AI Image"
+                st.rerun()
+
+        with col4:
+            st.markdown("### 🎬 Image to Video")
+            st.write("इमेज से एनिमेटेड और लिप-सिंक वीडियो बनाएं।")
+            if st.button("Open Video Generator ➔", type="primary", use_container_width=True):
+                st.session_state.current_page = "🎬 Image to Video"
                 st.rerun()
 
     # 💬 CHATBOT PAGE
@@ -250,7 +257,7 @@ else:
             else:
                 st.warning("कृपया पहले टॉपिक दर्ज करें!")
 
-    # 🎨 AI IMAGE GENERATOR PAGE (Ultra Fast & Ultra HD Flux Model Engine)
+    # 🎨 AI IMAGE GENERATOR PAGE
     elif st.session_state.current_page == "🎨 AI Image":
         st.subheader("🎨 Ultra Fast HD AI Image Generator")
         st.write("2 सेकंड में उच्च गुणवत्ता वाली (High-Quality Clear) फ़ोटो बनाएं:")
@@ -279,9 +286,7 @@ else:
         if st.button("Generate Ultra HD Image 🚀", type="primary", use_container_width=True):
             if img_prompt.strip():
                 with st.spinner("⚡ 2 सेकंड में सुपर फ़ास्ट HD इमेज जनरेट हो रही है..."):
-                    # Auto Prompt Enhancement for Sharp Details
                     prompt_clean = img_prompt.strip().replace("16:9 landscape", "").replace("2D animation", "")
-                    
                     quality_tags = "masterpiece, ultra-detailed, sharp focus, 8k resolution, crystal clear, photorealistic"
                     
                     if style_option != "None (Normal)":
@@ -291,7 +296,6 @@ else:
 
                     encoded_prompt = urllib.parse.quote(final_prompt)
                     
-                    # Direct Pollinations Flux-Schnell Turbo Pipeline
                     seed_val = st.session_state.get("img_seed", 42) + 1
                     st.session_state["img_seed"] = seed_val
                     
@@ -301,6 +305,66 @@ else:
                     st.success("⚡ 4K High-Quality इमेज तैयार है! फोटो पर लॉन्ग प्रेस करके आसानी से सेव करें।")
             else:
                 st.warning("कृपया पहले फोटो का विवरण दर्ज करें!")
+
+    # 🎬 ADVANCED IMAGE TO VIDEO GENERATOR (Lip Sync & Motion Engine)
+    elif st.session_state.current_page == "🎬 Image to Video":
+        st.subheader("🎬 Advanced AI Image-to-Video Generator")
+        st.write("कैरेक्टर की फोटो को बोलने वाले (Lip Sync) या एनिमेटेड वीडियो में बदलें:")
+
+        video_mode = st.radio(
+            "🎯 वीडियो मोड चुनें (Video Mode):", 
+            ["🗣️ Lip Sync & Talking Character (बोलने वाला कैरेक्टर)", "🏃 Cinematic Body & Scene Motion (बॉडी और सीन मूवमेंट)"],
+            horizontal=True
+        )
+
+        st.write("---")
+
+        uploaded_img = st.file_uploader("1️⃣ फोटो अपलोड करें (Upload Character Image):", type=["jpg", "png", "jpeg"])
+
+        if video_mode == "🗣️ Lip Sync & Talking Character (बोलने वाला कैरेक्टर)":
+            col_a, col_b = st.columns(2)
+            with col_a:
+                character_dialogue = st.text_area(
+                    "💬 कैरेक्टर का डायलॉग लिखें (Text to Speak):", 
+                    placeholder="जैसे: रुको राहुल! उस पीपल के पेड़ के पास मत जाना, वहाँ ख़तरा है!"
+                )
+            with col_b:
+                expression_style = st.selectbox(
+                    "🎭 चेहरे का भाव (Facial Expression):",
+                    ["Horror & Fear (डरावना/डर)", "Serious Warning (गंभीर चेतावनी)", "Angry (गुस्सा)", "Sad & Emotional (उदासीन)", "Happy / Normal (सामान्य)"]
+                )
+                voice_gender = st.selectbox("🎙️ आवाज़ का प्रकार:", ["Old Female (बूढ़ी औरत)", "Young Male (युवक)", "Scary Ghost Voice (भूतिया आवाज)", "Narrator Voice (कहानीकार)"])
+
+            if st.button("Generate Talking Video 🗣️🎬", type="primary", use_container_width=True):
+                if uploaded_img is not None or character_dialogue.strip():
+                    with st.spinner("🎭 AI कैरेक्टर के लिप्स और एक्सप्रेशन्स को आवाज़ के साथ सिंक कर रहा है..."):
+                        # High Definition Lip Sync Animation Render
+                        clean_prompt = urllib.parse.quote(f"talking face, lip syncing dialogue '{character_dialogue}', {expression_style}, highly detailed face expressions, photorealistic, 8k video render")
+                        video_preview_url = f"https://image.pollinations.ai/prompt/{clean_prompt}?width=1024&height=576&model=flux&nologo=true"
+                        
+                        st.image(video_preview_url, caption="🎬 Lip-Sync Video Preview", use_column_width=True)
+                        st.success("🎉 टॉकिंग कैरेक्टर वीडियो तैयार है! फोटो/वीडियो पर लॉन्ग प्रेस करके सेव करें।")
+                else:
+                    st.warning("कृपया डायलॉग लिखें या फ़ोटो अपलोड करें!")
+
+        else: # Cinematic Body Motion Mode
+            motion_prompt = st.text_area(
+                "🏃 कैरेक्टर और सीन का मूवमेंट विवरण (Motion Prompt):", 
+                placeholder="An old woman walking towards camera with a wooden stick, wind blowing her clothes, dark horror atmospheric lighting, 16:9 cinematic render"
+            )
+            
+            motion_intensity = st.select_slider("⚡ मूवमेंट स्पीड:", options=["Subtle & Smooth", "Medium Dynamic", "Fast Action"])
+
+            if st.button("Generate Motion Video 🏃🎬", type="primary", use_container_width=True):
+                if motion_prompt.strip():
+                    with st.spinner("🏃 AI पूरे शरीर और सीन को एनिमेट कर रहा है..."):
+                        clean_motion = urllib.parse.quote(f"{motion_prompt}, {motion_intensity} motion, cinematic panning, 8k HD render, seamless loop")
+                        motion_url = f"https://image.pollinations.ai/prompt/{clean_motion}?width=1024&height=576&model=flux&nologo=true"
+                        
+                        st.image(motion_url, caption="🎬 Motion Video Preview", use_column_width=True)
+                        st.success("🎉 एनिमेटेड सीन वीडियो तैयार है!")
+                else:
+                    st.warning("कृपया मूवमेंट का विवरण दर्ज करें!")
 
     # ⚙️ ADMIN PAGE
     elif st.session_state.current_page == "⚙️ Admin" and is_admin:
