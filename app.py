@@ -29,7 +29,7 @@ def init_supabase() -> Client:
 
 supabase = init_supabase()
 
-# Dynamic Dynamic API Key Management (Session State)
+# Dynamic API Key Management (Session State)
 if "active_api_keys" not in st.session_state:
     st.session_state.active_api_keys = {
         "GROQ_KEY": "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",
