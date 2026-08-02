@@ -4,15 +4,15 @@ from datetime import datetime
 
 def render_image_page():
     st.subheader("🎨 Pro Text-to-Image Studio")
-    st.write("साफ़ चेहरों और शानदार लाइटिंग के साथ हाई-क्वालिटी इमेज बनाएं:")
+    st.write("क्रिस्टल-क्लियर आँखों, शार्प बैकग्राउंड और एडवांस स्टाइल्स के साथ हाई-क्वालिटी इमेज बनाएं:")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="Family sitting sadly, clearly visible faces, expressive features...")
-    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="dark shadows on face, hidden face, blurry, low quality, bad anatomy")
+    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="Family sitting in a room, clearly visible sharp eyes, highly detailed background house interior...")
+    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry eyes, closed eyes, out of focus background, blurry walls, low quality")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
@@ -24,16 +24,16 @@ def render_image_page():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        ratio_option = st.selectbox("📐 Aspect Ratio", ["Portrait (9:16) - Best for Faces", "Square (1:1)", "Landscape (16:9)"])
-        if "9:16" in ratio_option:
-            width, height = 720, 1280
-        elif "1:1" in ratio_option:
-            width, height = 1024, 1024
-        else:
+        ratio_option = st.selectbox("📐 Aspect Ratio", ["Landscape (16:9)", "Portrait (9:16)", "Square (1:1)"])
+        if "16:9" in ratio_option:
             width, height = 1280, 720
+        elif "9:16" in ratio_option:
+            width, height = 720, 1280
+        else:
+            width, height = 1024, 1024
 
     with col2:
-        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (4K Sharp Face)", "HD Quality (1080p)", "Standard"])
+        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (Full Sharpness)", "HD Quality (1080p)", "Standard"])
         if "Ultra HD" in quality_mode:
             width, height = int(width * 1.25), int(height * 1.25)
 
@@ -42,31 +42,29 @@ def render_image_page():
 
     if st.button("🚀 Generate Images Now", type="primary", use_container_width=True):
         if img_prompt.strip():
-            with st.spinner(f"🎨 {style_option} स्टाइल और साफ़ चेहरों के साथ इमेज रेंडर हो रही है..."):
+            with st.spinner(f"🎨 {style_option} स्टाइल और फुल शार्प बैकग्राउंड के साथ इमेज रेंडर हो रही है..."):
                 
-                #强制 face illumination & visibility tags ताकि चेहरा अंधेरे में न छुपे
-                face_visibility = "face clearly visible, bright studio portrait lighting on faces, sharp eyes, highly detailed facial features, no dark shadows on face"
+                ultra_clarity_tags = "extremely detailed sharp eyes, crystal clear pupils, perfectly focused background, sharp room interior, highly detailed house environment, 8k resolution, flawless clarity"
                 
                 style_tags_map = {
-                    "Cinematic": f"cinematic portrait, professional key lighting on face, depth of field, 8k, {face_visibility}",
-                    "Realistic": f"hyper-realistic portrait, highly detailed facial features, perfectly illuminated face, sharp focus, 8k, {face_visibility}",
-                    "Anime": f"high quality anime portrait, beautifully lit expressive face, detailed eyes, {face_visibility}",
-                    "Pixar": f"3d disney pixar style character render, brightly lit expressive face, {face_visibility}",
-                    "3D": f"octane render, 3d character close-up, perfect facial lighting, highly detailed face, {face_visibility}",
-                    "2D": f"classic 2d vector character illustration, clean lines, clear bright facial expression",
-                    "Cartoon": f"fun cartoon style, clear expressive face, bright well-lit colors",
-                    "Fantasy": f"magical fantasy character portrait, glowing facial highlights, detailed face, {face_visibility}",
-                    "Sci-Fi": f"futuristic sci-fi character portrait, neon facial illumination, detailed face, {face_visibility}",
-                    "Watercolor": f"soft watercolor portrait painting, artistic brush strokes, clear bright face",
-                    "Oil Painting": f"classic oil painting portrait on canvas, rich textured brushwork, clear illuminated face"
+                    "Cinematic": f"cinematic wide shot, balanced lighting across entire room, sharp background details, {ultra_clarity_tags}",
+                    "Realistic": f"hyper-realistic photography, sharp focus on both subject and background house, {ultra_clarity_tags}",
+                    "Anime": f"high quality anime art, sharp detailed eyes, clear background scenery, {ultra_clarity_tags}",
+                    "Pixar": f"3d disney pixar style animation, sharp detailed environment, expressive eyes, {ultra_clarity_tags}",
+                    "3D": f"octane render, 3d environment design, sharp textures on walls and furniture, {ultra_clarity_tags}",
+                    "2D": f"classic 2d vector art, clean sharp lines, fully visible background house details",
+                    "Cartoon": f"fun cartoon style, bright clean background, expressive clear eyes",
+                    "Fantasy": f"magical fantasy art, crystal clear background environment, detailed eyes, {ultra_clarity_tags}",
+                    "Sci-Fi": f"futuristic sci-fi art, high-tech sharp background details, clear eyes, {ultra_clarity_tags}",
+                    "Watercolor": f"soft watercolor painting style, clear background architecture, detailed face",
+                    "Oil Painting": f"classic oil painting on canvas, rich background textures, clear facial expressions"
                 }
 
-                current_style_tag = style_tags_map.get(style_option, f"masterpiece, 8k, {face_visibility}")
+                current_style_tag = style_tags_map.get(style_option, f"masterpiece, 8k, {ultra_clarity_tags}")
                 clean_input = img_prompt.strip()
                 final_prompt = f"{clean_input}, {current_style_tag}"
                 
-                # Negative prompt to block dark or hidden faces completely
-                default_neg = "dark shadows on face, hidden face, black face, blurry, deformed features, low quality, bad anatomy"
+                default_neg = "blurry eyes, closed eyes, out of focus background, blurry house, foggy background, low quality, deformed anatomy"
                 if neg_prompt.strip():
                     final_neg = f"{neg_prompt.strip()}, {default_neg}"
                 else:
@@ -81,7 +79,7 @@ def render_image_page():
                     image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}"
                     generated_urls.append(image_url)
 
-                st.success(f"✨ साफ़ चेहरों के साथ {num_images} इमेज तैयार हैं!")
+                st.success(f"✨ क्रिस्टल-क्लियर आँखों और बैकग्राउंड के साथ {num_images} इमेज तैयार हैं!")
 
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
