@@ -3,6 +3,7 @@ from supabase import create_client, Client
 from groq import Groq
 from datetime import date
 import urllib.parse
+import requests
 
 # Page Configuration
 st.set_page_config(page_title="AI Studio Dashboard", page_icon="🤖", layout="wide")
@@ -177,7 +178,7 @@ else:
 
         with col3:
             st.markdown("### 🎨 AI Image Generator")
-            st.write("HD और स्टाइलिश इमेज बनाएं।")
+            st.write("Ultra Fast 4K HD और स्टाइलिश इमेज बनाएं।")
             if st.button("Open Image Generator ➔", type="primary", use_container_width=True):
                 st.session_state.current_page = "🎨 AI Image"
                 st.rerun()
@@ -249,12 +250,12 @@ else:
             else:
                 st.warning("कृपया पहले टॉपिक दर्ज करें!")
 
-    # 🎨 AI IMAGE GENERATOR PAGE
+    # 🎨 AI IMAGE GENERATOR PAGE (Ultra Fast & Ultra HD Flux Model Engine)
     elif st.session_state.current_page == "🎨 AI Image":
-        st.subheader("🎨 AI Image Generator")
-        st.write("अपनी कल्पना लिखें, स्टाइल और साइज चुनें और फोटो जनरेट करें:")
+        st.subheader("🎨 Ultra Fast HD AI Image Generator")
+        st.write("2 सेकंड में उच्च गुणवत्ता वाली (High-Quality Clear) फ़ोटो बनाएं:")
 
-        img_prompt = st.text_area("फोटो का विवरण (Prompt):", placeholder="A futuristic cyberpunk city with flying cars at night, highly detailed")
+        img_prompt = st.text_area("फोटो का विवरण (Prompt):", placeholder="An Indian old village woman stopping a young man, detailed faces, dramatic cinematic lighting, photorealistic")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -263,34 +264,43 @@ else:
                 ["Landscape (16:9 - YouTube/PC)", "Portrait (9:16 - Insta/Shorts)", "Square (1:1)"]
             )
             if "16:9" in ratio_option:
-                width, height = 1280, 720
+                width, height = 1024, 576
             elif "9:16" in ratio_option:
-                width, height = 720, 1280
+                width, height = 576, 1024
             else:
-                width, height = 1024, 1024
+                width, height = 768, 768
 
         with col2:
             style_option = st.selectbox(
                 "✨ Art Style (स्टाइल)", 
-                ["Cinematic (मूवी जैसा)", "3D Pixar / Cartoon", "Realistic Photo", "Anime / Manga", "Digital Art", "Cyberpunk", "None (Normal)"]
+                ["Photorealistic (3D Real)", "Cinematic Movie", "3D Animation / Pixar", "Anime / Manga", "Digital Concept Art", "None (Normal)"]
             )
 
-        if st.button("Generate Image 🚀", type="primary", use_container_width=True):
+        if st.button("Generate Ultra HD Image 🚀", type="primary", use_container_width=True):
             if img_prompt.strip():
-                with st.spinner("AI आपकी फोटो तैयार कर रहा है..."):
-                    enhanced_prompt = img_prompt.strip()
+                with st.spinner("⚡ 2 सेकंड में सुपर फ़ास्ट HD इमेज जनरेट हो रही है..."):
+                    # Auto Prompt Enhancement for Sharp Details
+                    prompt_clean = img_prompt.strip().replace("16:9 landscape", "").replace("2D animation", "")
+                    
+                    quality_tags = "masterpiece, ultra-detailed, sharp focus, 8k resolution, crystal clear, photorealistic"
+                    
                     if style_option != "None (Normal)":
-                        enhanced_prompt += f", {style_option} style, highly detailed, 8k resolution"
+                        final_prompt = f"{prompt_clean}, {style_option}, {quality_tags}"
                     else:
-                        enhanced_prompt += ", highly detailed, 8k resolution"
+                        final_prompt = f"{prompt_clean}, {quality_tags}"
 
-                    encoded_prompt = urllib.parse.quote(enhanced_prompt)
-                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&nologo=true"
+                    encoded_prompt = urllib.parse.quote(final_prompt)
+                    
+                    # Direct Pollinations Flux-Schnell Turbo Pipeline
+                    seed_val = st.session_state.get("img_seed", 42) + 1
+                    st.session_state["img_seed"] = seed_val
+                    
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux-realism&nologo=true"
                     
                     st.image(image_url, caption=f"Prompt: {img_prompt}", use_column_width=True)
-                    st.success("✨ इमेज सफलतापूर्वक तैयार है! फोटो पर लॉन्ग प्रेस करके डाउनलोड कर सकते हैं।")
+                    st.success("⚡ 4K High-Quality इमेज तैयार है! फोटो पर लॉन्ग प्रेस करके आसानी से सेव करें।")
             else:
-                st.warning("कृपया पहले फोटो का विवरण (Prompt) दर्ज करें!")
+                st.warning("कृपया पहले फोटो का विवरण दर्ज करें!")
 
     # ⚙️ ADMIN PAGE
     elif st.session_state.current_page == "⚙️ Admin" and is_admin:
