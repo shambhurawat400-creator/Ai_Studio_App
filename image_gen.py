@@ -3,81 +3,85 @@ import urllib.parse
 from datetime import datetime
 
 def render_image_page():
-    st.subheader("🎨 Ultra HD 3D Pixar Studio")
-    st.write("डिस्टिंस और पिक्सर जैसी हाई-क्वालिटी 3D कार्टून इमेज बनाएं:")
+    st.subheader("🎨 Pro Text-to-Image Studio")
+    st.write("सभी पसंदीदा स्टाइल्स, शार्प आँखों और ऑटोमैटिक शानदार क्वालिटी के साथ इमेज बनाएं:")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="Cute animals looking at a glowing magical star trapped in wooden sticks, forest background...")
-    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry, low quality, deformed, ugly, bad anatomy")
+    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="An Indian old village woman near a haunted well...")
+    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry eyes, dark shadows, low quality, bad anatomy")
 
+    # --- All Original Styles Restored ---
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
-        "3D Pixar / Disney Animation", 
-        "Cinematic 3D Render", 
-        "Hyper-Realistic", 
-        "Anime Style", 
-        "Fantasy Magic"
+        "Cinematic", "Realistic", "Anime", "Pixar", "3D", 
+        "2D", "Cartoon", "Fantasy", "Sci-Fi", 
+        "Watercolor", "Oil Painting"
     ])
 
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        ratio_option = st.selectbox("📐 Aspect Ratio", ["Portrait (9:16) - Best for Mobile", "Square (1:1)", "Landscape (16:9)"])
-        if "9:16" in ratio_option:
-            width, height = 720, 1280
-        elif "1:1" in ratio_option:
-            width, height = 1024, 1024
-        else:
+        ratio_option = st.selectbox("📐 Aspect Ratio", ["Landscape (16:9)", "Portrait (9:16)", "Square (1:1)"])
+        if "16:9" in ratio_option:
             width, height = 1280, 720
+        elif "9:16" in ratio_option:
+            width, height = 720, 1280
+        else:
+            width, height = 1024, 1024
 
     with col2:
-        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (4K Masterpiece)", "HD Quality (1080p)"])
+        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (4K)", "HD Quality (1080p)", "Standard"])
         if "Ultra HD" in quality_mode:
-            width, height = int(width * 1.3), int(height * 1.3)
+            width, height = int(width * 1.25), int(height * 1.25)
 
     with col3:
         num_images = st.slider("🔢 Number of Images", 1, 4, 1)
 
-    if st.button("🚀 Generate Pixar Quality Image", type="primary", use_container_width=True):
+    if st.button("🚀 Generate Images Now", type="primary", use_container_width=True):
         if img_prompt.strip():
-            with st.spinner(f"✨ पिक्सर स्टूडियो क्वालिटी में इमेज रेंडर हो रही है... कृपया प्रतीक्षा करें..."):
+            with st.spinner(f"🎨 {style_option} स्टाइल और बेहतरीन क्वालिटी में इमेज रेंडर हो रही है..."):
                 
-                # DALL-E 3 & Pixar style high-end rendering tags for texture, lighting and fur details
-                pixar_master_tags = "3d disney pixar style animation, unreal engine 5 render, cinematic volumetric sunlight, glowing magic particles, highly detailed fur and textures, crystal clear sharp expressive eyes, masterpiece, 8k resolution, photorealistic lighting"
+                # Universal auto-enhancement for eyes, clarity and vibrant colors across all styles
+                auto_enhancers = "extremely detailed sharp eyes, crystal clear pupils, perfectly focused background, vibrant rich colors, stunning visual effects, 8k resolution, flawless clarity"
                 
                 style_tags_map = {
-                    "3D Pixar / Disney Animation": f"3d disney pixar style animation, cute expressive characters, {pixar_master_tags}",
-                    "Cinematic 3D Render": f"cinematic 3d render, dramatic golden hour lighting, octane render, {pixar_master_tags}",
-                    "Hyper-Realistic": f"hyper-realistic photography, sharp focus, incredibly detailed textures, {pixar_master_tags}",
-                    "Anime": f"high quality studio ghibli anime art, vibrant colors, detailed line art, {pixar_master_tags}",
-                    "Fantasy": f"magical fantasy art, ethereal glowing atmosphere, epic lighting, {pixar_master_tags}"
+                    "Cinematic": f"cinematic film still, dramatic lighting, depth of field, 8k, photorealistic, {auto_enhancers}",
+                    "Realistic": f"hyper-realistic, highly detailed, photorealistic, sharp focus, 8k resolution, {auto_enhancers}",
+                    "Anime": f"high quality anime art, studio ghibli style, vibrant colors, detailed line art, {auto_enhancers}",
+                    "Pixar": f"3d disney pixar style animation, cute, vibrant lighting, unreal engine 5 render, {auto_enhancers}",
+                    "3D": f"octane render, 3d blender art, volumetric lighting, highly detailed, {auto_enhancers}",
+                    "2D": f"classic 2d vector art, clean lines, professional illustration, {auto_enhancers}",
+                    "Cartoon": f"fun cartoon style, bold outlines, bright expressive colors, {auto_enhancers}",
+                    "Fantasy": f"magical fantasy art, ethereal glow, mythical environment, epic composition, {auto_enhancers}",
+                    "Sci-Fi": f"futuristic sci-fi concept art, cyberpunk neon lights, high-tech details, {auto_enhancers}",
+                    "Watercolor": f"soft watercolor painting style, artistic brush strokes, pastel paper texture, {auto_enhancers}",
+                    "Oil Painting": f"classic oil painting on canvas, rich textured brushwork, masterpiece, {auto_enhancers}"
                 }
 
-                current_style_tag = style_tags_map.get(style_option, pixar_master_tags)
+                current_style_tag = style_tags_map.get(style_option, f"masterpiece, 8k, {auto_enhancers}")
                 clean_input = img_prompt.strip()
                 final_prompt = f"{clean_input}, {current_style_tag}"
                 
-                default_neg = "blurry, deformed eyes, low quality, bad anatomy, ugly, flat colors, bad lighting"
+                default_neg = "blurry eyes, closed eyes, dark shadows on face, dull colors, low quality, bad anatomy, ugly"
                 if neg_prompt.strip():
                     final_neg = f"{neg_prompt.strip()}, {default_neg}"
                 else:
                     final_neg = default_neg
 
                 encoded_prompt = urllib.parse.quote(final_prompt)
-                encoded_neg = urllib.parse.quote(default_neg)
+                encoded_neg = urllib.parse.quote(final_neg)
                 
                 generated_urls = []
                 for i in range(num_images):
                     seed_val = datetime.now().microsecond + i
-                    # Using advanced flux/prodia parameters via pollinations for better texture
-                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux-realism&nologo=true&negative={encoded_neg}"
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}"
                     generated_urls.append(image_url)
 
-                st.success(f"🎉 शानदार पिक्सर क्वालिटी की {num_images} इमेज तैयार हैं!")
+                st.success(f"✨ सफलतापूर्वक {num_images} इमेज तैयार हो गई हैं!")
 
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
