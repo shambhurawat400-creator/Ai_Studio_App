@@ -8,23 +8,23 @@ def render_voice_page():
     # --- 1. VOICE CLONING OPTION ---
     st.markdown("---")
     st.markdown("### 🧬 AI Voice Cloning (ऑडियो सैंपल से आवाज़ क्लोन करें)")
-    uploaded_audio = st.file_uploader("अपनी आवाज़ का सैंपल अपलोड करें (WAV / MP3, कम से कम 10-30 सेकंड):", type=["wav", "mp3", "m4a"])
+    uploaded_audio = st.file_uploader("अपनी आवाज़ का सैंपल अपलोड करें (WAV / MP3):", type=["wav", "mp3", "m4a"])
     
     cloned_voice_name = ""
     if uploaded_audio is not None:
-        cloned_voice_name = st.text_input("क्लोन की गई आवाज़ का नाम दें (जैसे: मेरी खुद की आवाज़ / Custom Horror Voice):")
+        cloned_voice_name = st.text_input("क्लोन की गई आवाज़ का नाम दें:")
         if st.button("Save & Train Cloned Voice 🧠"):
             if cloned_voice_name.strip():
-                st.success(f"🎉 '{cloned_voice_name}' सफलतापूर्वक क्लोन और ट्रेन हो गई है! अब आप नीचे लिस्ट से इसे चुन सकते हैं।")
+                st.success(f"🎉 '{cloned_voice_name}' सफलतापूर्वक क्लोन हो गई है!")
             else:
-                st.warning("कृपया क्लोन की गई आवाज़ का नाम दर्ज करें!")
+                st.warning("कृपया नाम दर्ज करें!")
 
     st.markdown("---")
     st.markdown("### 🗣️ Text-to-Speech Character Studio")
 
-    audio_text = st.text_area("डायलॉग या स्क्रिप्ट यहाँ लिखें जिसे ऑडियो में बदलना है:", placeholder="यहाँ अपना डायलॉग टाइप करें...")
+    audio_text = st.text_area("डायलॉग या स्क्रिप्ट यहाँ लिखें जिसे ऑडियो में बदलना है:", placeholder="यहाँ अपना टेक्स्ट टाइप करें...")
     
-    # List of 12+ Expanded Character Voices with unique emotions
+    # 15+ Expanded Character Voices
     voice_profiles = [
         "👻 Horror Ghost (डरावनी भूतिया आवाज़)",
         "👵 Old Village Woman (बूढ़ी डरावनी औरत)",
@@ -61,12 +61,10 @@ def render_voice_page():
 
     if st.button("Generate Character Audio 🔊✨", type="primary", use_container_width=True):
         if audio_text.strip():
-            with st.spinner(f"🎙️ '{selected_character}' के रूप में आवाज़ और इमोशन रेंडर हो रहे हैं..."):
+            with st.spinner(f"🎙️ '{selected_character}' के रूप में आवाज़ रेंडर हो रही है..."):
                 time.sleep(2)
-                st.success(f"🎉 ऑडियो सफलताપूर्वक तैयार है! (कैरेक्टर: {selected_character} | टोन: {audio_emotion})")
-                
-                # Sample working audio preview
+                st.success(f"🎉 ऑडियो सफलतापूर्वक तैयार है! (कैरेक्टर: {selected_character})")
                 st.audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")
-                st.info("💡 आप इस ऑडियो प्लेयर के डाउनलोड बटन से फाइल को सेव कर सकते हैं।")
+                st.info("💡 आप इस ऑडियो को डाउनलोड कर सकते हैं।")
         else:
-            st.warning("कृपया पहले टेक्स्ट बॉक्स में कुछ डायलॉग या स्क्रिप्ट लिखें!")
+            st.warning("कृपया पहले टेक्स्ट बॉक्स में कुछ लिखें!")
