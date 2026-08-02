@@ -2,7 +2,7 @@ import sys
 import os
 from pathlib import Path
 
-# --- THE ULTIMATE ROOT PATH FIX ---
+# --- ABSOLUTE PATH FIX FOR SEPARATE MODULES ---
 file_path = Path(__file__).resolve()
 parent_dir = file_path.parent
 sys.path.insert(0, str(parent_dir))
