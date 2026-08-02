@@ -118,8 +118,8 @@ else:
     user_email = st.session_state.user.email
     is_admin = user_email == ADMIN_EMAIL
 
-    # Header Bar
-    head_col1, head_col2 = st.columns([4, 1])
+    # Top Header & Logout
+    head_col1, head_col2 = st.columns([5, 1])
     with head_col1:
         st.title("🤖 AI Studio Hub")
     with head_col2:
@@ -128,14 +128,21 @@ else:
             st.session_state.user = None
             st.rerun()
 
-    # Top Navigation Selection
+    # --- HORIZONTAL NAVIGATION BAR ---
+    st.write("---")
+    
     if is_admin:
-        nav_options = ["🏠 Dashboard", "👑 Admin Assistant", "💬 AI Chatbot", "🎨 AI Image Generator", "⚙️ App Settings"]
+        nav_cols = st.columns(5)
+        pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎨 AI Image", "⚙️ Admin"]
     else:
-        nav_options = ["🏠 Dashboard", "💬 AI Chatbot", "🎨 AI Image Generator"]
+        nav_cols = st.columns(4)
+        pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎨 AI Image"]
 
-    selected_nav = st.selectbox("📌 Select Feature / Navigation:", nav_options, index=nav_options.index(st.session_state.current_page) if st.session_state.current_page in nav_options else 0)
-    st.session_state.current_page = selected_nav
+    for i, page in enumerate(pages):
+        btn_type = "primary" if st.session_state.current_page == page else "secondary"
+        if nav_cols[i].button(page, type=btn_type, use_container_width=True):
+            st.session_state.current_page = page
+            st.rerun()
 
     st.write("---")
 
@@ -150,50 +157,34 @@ else:
             remaining = max(0, DAILY_FREE_LIMIT - today_count)
             st.info(f"👤 **Role:** Free User | 📊 **आज का यूसेज:** {today_count}/{DAILY_FREE_LIMIT} मैसेज (बचे: {remaining})")
 
-        st.write("### 🚀 Available AI Tools")
-        st.caption("नीचे दिए गए टूल पर क्लिक करके काम शुरू करें:")
+        st.write("### 🚀 Quick Access Tools")
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.markdown("### 💬 AI Chat Assistant")
+            st.markdown("### 💬 AI Chatbot")
             st.write("स्मार्ट AI से सवाल पूछें और बातचीत करें।")
-            if st.button("Open AI Chat ➔", type="primary", use_container_width=True):
+            if st.button("Open Chatbot ➔", type="primary", use_container_width=True):
                 st.session_state.current_page = "💬 AI Chatbot"
                 st.rerun()
 
         with col2:
-            st.markdown("### 🎨 AI Image Generator")
-            st.write("शानदार स्टाइल्स और आस्पेक्ट रेशियो के साथ HD इमेज बनाएं।")
-            if st.button("Open Image Generator ➔", type="primary", use_container_width=True):
-                st.session_state.current_page = "🎨 AI Image Generator"
+            st.markdown("### 📜 AI Script Generator")
+            st.write("YouTube, Reels और स्टोरीज के लिए स्क्रिप्ट लिखें।")
+            if st.button("Open Script Tool ➔", type="primary", use_container_width=True):
+                st.session_state.current_page = "📜 AI Script"
                 st.rerun()
 
-        if is_admin:
-            st.write("---")
-            st.write("### 👑 Admin Special Tools")
-            admin_col1, admin_col2 = st.columns(2)
-            
-            with admin_col1:
-                st.markdown("### 👑 Admin Assistant")
-                st.write("ऐप सेटिंग्स और कॉन्फ़िगरेशन के लिए एडमिन AI।")
-                if st.button("Open Admin Assistant ➔", use_container_width=True):
-                    st.session_state.current_page = "👑 Admin Assistant"
-                    st.rerun()
-
-            with admin_col2:
-                st.markdown("### ⚙️ App Settings & Rules")
-                st.write("ऐप के नियम और प्राइसिंग एडिट करें।")
-                if st.button("Open App Settings ➔", use_container_width=True):
-                    st.session_state.current_page = "⚙️ App Settings"
-                    st.rerun()
+        with col3:
+            st.markdown("### 🎨 AI Image Generator")
+            st.write("HD और स्टाइलिश इमेज बनाएं।")
+            if st.button("Open Image Generator ➔", type="primary", use_container_width=True):
+                st.session_state.current_page = "🎨 AI Image"
+                st.rerun()
 
     # 💬 CHATBOT PAGE
     elif st.session_state.current_page == "💬 AI Chatbot":
         st.subheader("💬 AI Chat Assistant")
-
-        with st.expander("ℹ️ Rules & Pricing"):
-            st.write(st.session_state.pricing_rules)
 
         user_history = load_chat_history(user_email, "user")
         for msg in user_history:
@@ -231,10 +222,37 @@ else:
             except Exception as e:
                 st.error(f"Error: {str(e)}")
 
-    # 🎨 AI IMAGE GENERATOR PAGE (Ultra HD Quality Upgrade)
-    elif st.session_state.current_page == "🎨 AI Image Generator":
-        st.subheader("🎨 AI HD Image Generator")
-        st.write("अपनी कल्पना लिखें, स्टाइल और साइज चुनें और **Ultra HD** फोटो जनरेट करें:")
+    # 📜 AI SCRIPT GENERATOR PAGE
+    elif st.session_state.current_page == "📜 AI Script":
+        st.subheader("📜 AI Video & Story Script Writer")
+        st.write("अपने यूट्यूब वीडियो, रील्स या हॉरर स्टोरी की स्क्रिप्ट तैयार करें:")
+
+        topic = st.text_input("स्क्रिप्ट का टॉपिक/विषय दर्ज करें:", placeholder="जैसे: Horror story near a haunted well in village")
+        script_type = st.selectbox("स्क्रिप्ट का प्रकार (Type):", ["YouTube Video (Full Script)", "Instagram Reel / Shorts (60sec)", "Horror Story / Storytelling", "Educational / Business"])
+
+        if st.button("Generate Script ✍️", type="primary", use_container_width=True):
+            if topic.strip():
+                with st.spinner("AI स्क्रिप्ट लिख रहा है..."):
+                    try:
+                        groq_client = get_groq_client(0)
+                        prompt = f"Write a detailed {script_type} in Hindi/Hinglish on the topic: '{topic}'. Include scene details, narrator lines, and visual cues."
+                        
+                        response = groq_client.chat.completions.create(
+                            model="llama-3.1-8b-instant",
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        script_res = response.choices[0].message.content
+                        st.markdown("### 📝 Generated Script:")
+                        st.text_area("आपकी स्क्रिप्ट:", value=script_res, height=350)
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+            else:
+                st.warning("कृपया पहले टॉपिक दर्ज करें!")
+
+    # 🎨 AI IMAGE GENERATOR PAGE
+    elif st.session_state.current_page == "🎨 AI Image":
+        st.subheader("🎨 AI Image Generator")
+        st.write("अपनी कल्पना लिखें, स्टाइल और साइज चुनें और फोटो जनरेट करें:")
 
         img_prompt = st.text_area("फोटो का विवरण (Prompt):", placeholder="A futuristic cyberpunk city with flying cars at night, highly detailed")
         
@@ -242,7 +260,7 @@ else:
         with col1:
             ratio_option = st.selectbox(
                 "📐 Aspect Ratio (साइज)", 
-                ["Square (1:1)", "Landscape (16:9 - YouTube/PC)", "Portrait (9:16 - Insta/Shorts)"]
+                ["Landscape (16:9 - YouTube/PC)", "Portrait (9:16 - Insta/Shorts)", "Square (1:1)"]
             )
             if "16:9" in ratio_option:
                 width, height = 1280, 720
@@ -254,69 +272,29 @@ else:
         with col2:
             style_option = st.selectbox(
                 "✨ Art Style (स्टाइल)", 
-                ["Cinematic (मूवी जैसा)", "Realistic Photo (असली फोटो)", "Anime / Manga", "3D Pixar / Cartoon", "Digital Art", "Cyberpunk", "None (Normal)"]
+                ["Cinematic (मूवी जैसा)", "3D Pixar / Cartoon", "Realistic Photo", "Anime / Manga", "Digital Art", "Cyberpunk", "None (Normal)"]
             )
 
-        if st.button("Generate HD Image 🚀", type="primary", use_container_width=True):
+        if st.button("Generate Image 🚀", type="primary", use_container_width=True):
             if img_prompt.strip():
-                with st.spinner("AI 4K Ultra HD में आपकी फोटो तैयार कर रहा है..."):
-                    # Quality Booster Tags
-                    quality_boosters = "masterpiece, 8k resolution, highly detailed, sharp focus, professional photography"
-                    
+                with st.spinner("AI आपकी फोटो तैयार कर रहा है..."):
+                    enhanced_prompt = img_prompt.strip()
                     if style_option != "None (Normal)":
-                        final_prompt = f"{img_prompt}, {style_option} style, {quality_boosters}"
+                        enhanced_prompt += f", {style_option} style, highly detailed, 8k resolution"
                     else:
-                        final_prompt = f"{img_prompt}, {quality_boosters}"
+                        enhanced_prompt += ", highly detailed, 8k resolution"
 
-                    encoded_prompt = urllib.parse.quote(final_prompt)
-                    
-                    # Flux Model + HD Parameters
-                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model=flux&enhance=true&nologo=true"
+                    encoded_prompt = urllib.parse.quote(enhanced_prompt)
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&nologo=true"
                     
                     st.image(image_url, caption=f"Prompt: {img_prompt}", use_column_width=True)
-                    st.success("✨ HD इमेज सफलतापूर्वक तैयार है! फोटो पर लॉन्ग प्रेस करके डाउनलोड कर सकते हैं।")
+                    st.success("✨ इमेज सफलतापूर्वक तैयार है! फोटो पर लॉन्ग प्रेस करके डाउनलोड कर सकते हैं।")
             else:
                 st.warning("कृपया पहले फोटो का विवरण (Prompt) दर्ज करें!")
 
-    # 👑 ADMIN ASSISTANT PAGE
-    elif st.session_state.current_page == "👑 Admin Assistant" and is_admin:
-        st.subheader("👑 Admin AI Assistant")
-
-        admin_history = load_chat_history(user_email, "admin")
-        for msg in admin_history:
-            with st.chat_message(msg["role"]):
-                st.write(msg["content"])
-
-        if prompt := st.chat_input("Admin Assistant से कुछ भी चेंज या हेल्प मांगें..."):
-            with st.chat_message("user"):
-                st.write(prompt)
-            save_chat_message(user_email, "user", prompt, "admin")
-
-            sys_prompt = f"You are an Admin Assistant for AI Studio App. Rules: '{st.session_state.pricing_rules}'."
-            
-            try:
-                groq_client = get_groq_client(0)
-                current_messages = [{"role": "system", "content": "You are a helpful assistant."}]
-                for m in admin_history:
-                    current_messages.append({"role": m["role"], "content": m["content"]})
-                current_messages.append({"role": "user", "content": prompt})
-
-                response = groq_client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
-                    messages=current_messages
-                )
-                bot_res = response.choices[0].message.content
-                
-                with st.chat_message("assistant"):
-                    st.write(bot_res)
-                save_chat_message(user_email, "assistant", bot_res, "admin")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
-
-    # ⚙️ APP SETTINGS PAGE
-    elif st.session_state.current_page == "⚙️ App Settings" and is_admin:
-        st.subheader("⚙️ App Pricing & Rules Control")
+    # ⚙️ ADMIN PAGE
+    elif st.session_state.current_page == "⚙️ Admin" and is_admin:
+        st.subheader("⚙️ Admin Dashboard & Settings")
         st.write("**Current Rules:**", st.session_state.pricing_rules)
 
         st.write("---")
