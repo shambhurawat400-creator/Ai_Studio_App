@@ -13,11 +13,11 @@ from groq import Groq
 from datetime import date
 import time
 
-# Import custom modules safely (Only the ones we have)
+# Import all custom modules safely
+from script_gen import render_script_page
 from image_gen import render_image_page
 from video_gen import render_video_page
 from voice_tools import render_voice_page
-from script_gen import render_script_page
 
 # Page Configuration
 st.set_page_config(page_title="AI Studio Dashboard", page_icon="🤖", layout="wide")
@@ -47,7 +47,7 @@ with head_col1:
 
 st.write("---")
 
-# Navigation Bar
+# Navigation Bar with Script Page Included
 pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎙️ Voice Studio", "🎨 AI Image", "🎬 Image to Video"]
 
 nav_cols = st.columns(len(pages))
