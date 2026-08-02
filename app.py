@@ -4,9 +4,11 @@ from groq import Groq
 from datetime import date
 import time
 
-# --- CRITICAL FIX FOR MODULE IMPORTS ---
+# --- GUARANTEED FIX FOR ALL MODULE IMPORTS ---
 import sys, os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+sys.path.insert(0, os.path.dirname(current_dir))
 
 # Import all custom separate modules
 from auth import handle_login_session, render_auth_ui, logout_user
