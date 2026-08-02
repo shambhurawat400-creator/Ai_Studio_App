@@ -4,19 +4,16 @@ from datetime import datetime
 
 def render_image_page():
     st.subheader("🎨 Pro Text-to-Image Studio")
-    st.write("एडवांस कंट्रोल्स, नेगेटिव प्रॉम्प्ट और múltiples स्टाइल्स के साथ हाई-क्वालिटी इमेज बनाएं:")
+    st.write("एडवांस कंट्रोल्स, नेगेटिव प्रॉम्प्ट और स्टाइल्स के साथ हाई-क्वालिटी इमेज बनाएं:")
 
-    # --- Initialize History and Saved Projects in Session State ---
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    # --- 1. PROMPT & NEGATIVE PROMPT ---
     img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="An Indian old village woman near a haunted well...")
-    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry, low quality, deformed, bad anatomy, ugly, extra limbs")
+    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry, low quality, deformed, bad anatomy")
 
-    # --- 2. STYLES & CATEGORIES ---
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
         "Cinematic", "Realistic", "Anime", "Pixar", "3D", 
@@ -24,7 +21,6 @@ def render_image_page():
         "Watercolor", "Oil Painting"
     ])
 
-    # --- 3. CONTROLS & SETTINGS (Layout Columns) ---
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -38,19 +34,16 @@ def render_image_page():
 
     with col2:
         quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (4K)", "HD Quality (1080p)", "Standard"])
-        # Quality multipliers for sharpness
         if "Ultra HD" in quality_mode:
             width, height = int(width * 1.25), int(height * 1.25)
 
     with col3:
         num_images = st.slider("🔢 Number of Images", 1, 4, 1)
 
-    # --- 4. GENERATE BUTTON ---
     if st.button("🚀 Generate Images Now", type="primary", use_container_width=True):
         if img_prompt.strip():
             with st.spinner(f"🎨 {style_option} स्टाइल और {quality_mode} क्वालिटी में इमेज रेंडर हो रही है..."):
                 
-                # Style Tags Mapping for High Quality Results
                 style_tags_map = {
                     "Cinematic": "cinematic film still, dramatic lighting, depth of field, 8k, photorealistic",
                     "Realistic": "hyper-realistic, highly detailed, photorealistic, sharp focus, 8k resolution",
@@ -74,7 +67,6 @@ def render_image_page():
 
                 encoded_prompt = urllib.parse.quote(final_prompt)
                 
-                # Loop to generate multiple images if requested
                 generated_urls = []
                 for i in range(num_images):
                     seed_val = datetime.now().microsecond + i
@@ -83,13 +75,10 @@ def render_image_page():
 
                 st.success(f"✨ सफलतापूर्वक {num_images} इमेज तैयार हो गई हैं!")
 
-                # Display Images
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
                     with cols[idx % len(cols)]:
                         st.image(url, caption=f"Style: {style_option} | #{idx+1}", use_column_width=True)
-                        
-                        # --- Download & Project Save Buttons ---
                         st.markdown(f"[📥 Download Image {idx+1}]({url})")
                         
                         if st.button(f"💾 Save Project #{idx+1}", key=f"save_{seed_val}_{idx}"):
@@ -98,12 +87,10 @@ def render_image_page():
                                 st.session_state.saved_projects.append(project_data)
                                 st.success("📁 प्रोजेक्ट सफलतापूर्वक सेव हो गया!")
 
-                # Add to History
                 st.session_state.image_history.insert(0, {"prompt": img_prompt, "style": style_option, "url": generated_urls[0]})
         else:
             st.warning("⚠️ कृपया पहले प्रॉम्प्ट बॉक्स में इमेज का विवरण (Prompt) दर्ज करें!")
 
-    # --- 5. HISTORY & SAVED PROJECTS TABS ---
     st.markdown("---")
     tab1, tab2 = st.tabs(["📂 Saved Projects", "📜 Generation History"])
 
@@ -113,7 +100,7 @@ def render_image_page():
             for p_idx, proj in enumerate(st.session_state.saved_projects):
                 st.write(f"**{p_idx+1}. Style:** {proj['style']} | **Prompt:** {proj['prompt']}")
                 st.image(proj['url'], width=300)
-                st.markdown(f"[🔗 Direct Link]({proj['url'])")
+                st.markdown(f"[🔗 Direct Link]({proj['url']})")
                 st.write("---")
         else:
             st.info("कोई प्रोजेक्ट सेव नहीं है।")
@@ -121,7 +108,7 @@ def render_image_page():
     with tab2:
         st.subheader("पिछली जनरेट की गई इमेजेस (History)")
         if st.session_state.image_history:
-            for h_idx, hist in enumerate(st.session_state.image_history[:5]): # Show last 5
+            for h_idx, hist in enumerate(st.session_state.image_history[:5]):
                 st.write(f"**Style:** {hist['style']} | **Prompt:** {hist['prompt']}")
                 st.image(hist['url'], width=250)
                 st.write("---")
