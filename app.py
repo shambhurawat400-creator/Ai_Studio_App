@@ -1,8 +1,25 @@
+import sys
+import os
+from pathlib import Path
+
+# --- THE ULTIMATE ROOT PATH FIX ---
+file_path = Path(__file__).resolve()
+parent_dir = file_path.parent
+sys.path.insert(0, str(parent_dir))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import streamlit as st
 from supabase import create_client, Client
 from groq import Groq
 from datetime import date
 import time
+
+# Import all custom separate modules safely
+from auth import handle_login_session, render_auth_ui, logout_user
+from image_gen import render_image_page
+from video_gen import render_video_page
+from voice_tools import render_voice_page
+from script_gen import render_script_page
 
 # Page Configuration
 st.set_page_config(page_title="AI Studio Dashboard", page_icon="🤖", layout="wide")
@@ -18,54 +35,7 @@ def init_supabase() -> Client:
 
 supabase = init_supabase()
 
-# --- EMBEDDED AUTH FUNCTIONS (NO SEPARATE FILE NEEDED) ---
-def handle_login_session(sb_client):
-    query_params = st.query_params
-    if "access_token" in query_params:
-        try:
-            token = query_params["access_token"]
-            res = sb_client.auth.get_user(token)
-            if res and res.user:
-                st.session_state.user = res.user
-        except Exception:
-            pass
-
-def render_auth_ui(sb_client):
-    st.subheader("🔐 Login / Sign Up to AI Studio")
-    tab1, tab2 = st.tabs(["Login", "Sign Up"])
-    
-    with tab1:
-        email = st.text_input("Email", key="l_email")
-        password = st.text_input("Password", type="password", key="l_pass")
-        if st.button("Login", type="primary"):
-            try:
-                res = sb_client.auth.sign_in_with_password({"email": email, "password": password})
-                st.session_state.user = res.user
-                st.success("सफलतापूर्वक लॉगिन हो गया!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Login Error: {str(e)}")
-                
-    with tab2:
-        s_email = st.text_input("Email", key="s_email")
-        s_pass = st.text_input("Password", type="password", key="s_pass")
-        if st.button("Create Account"):
-            try:
-                sb_client.auth.sign_up({"email": s_email, "password": s_pass})
-                st.success("अकाउंट बन गया! अब Login टैब से लॉगिन करें।")
-            except Exception as e:
-                st.error(f"Sign Up Error: {str(e)}")
-
-def logout_user(sb_client):
-    try:
-        sb_client.auth.sign_out()
-    except Exception:
-        pass
-    if "user" in st.session_state:
-        del st.session_state["user"]
-    st.rerun()
-
-# Dynamic API Key Management
+# Dynamic API Key Management (Session State)
 if "active_api_keys" not in st.session_state:
     st.session_state.active_api_keys = {
         "GROQ_KEY": "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",
@@ -77,6 +47,7 @@ if "active_api_keys" not in st.session_state:
 def get_groq_client() -> Groq:
     return Groq(api_key=st.session_state.active_api_keys["GROQ_KEY"])
 
+# Chat Helpers
 def load_chat_history(user_email, chat_type):
     try:
         res = supabase.table("user_chats").select("role, content").eq("user_email", user_email).eq("chat_type", chat_type).order("created_at", desc=False).execute()
@@ -101,6 +72,9 @@ def get_today_message_count(user_email):
 if "current_page" not in st.session_state:
     st.session_state.current_page = "🏠 Dashboard"
 
+if "pricing_rules" not in st.session_state:
+    st.session_state.pricing_rules = f"फ़्री प्लान: रोजाना {DAILY_FREE_LIMIT} मैसेज। प्रो प्लान: ₹199/महीना।"
+
 # Persistent Login Check
 handle_login_session(supabase)
 
@@ -119,6 +93,7 @@ else:
 
     st.write("---")
     
+    # Navigation Bar
     pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎙️ Voice Studio", "🎨 AI Image", "🎬 Image to Video"]
     if is_admin:
         pages.append("⚙️ Admin AI Assistant")
@@ -132,13 +107,38 @@ else:
 
     st.write("---")
 
+    # Routing Pages
     if st.session_state.current_page == "🏠 Dashboard":
         st.subheader(f"👋 Welcome, {user_email}!")
         if is_admin:
-            st.success("👑 **Role:** Super Admin | **Access:** Full Control")
+            st.success("👑 **Role:** Super Admin | **Access:** Full Control Over APIs & Settings")
         else:
             today_count = get_today_message_count(user_email)
             st.info(f"👤 **Role:** Free User | 📊 **आज का यूसेज:** {today_count}/{DAILY_FREE_LIMIT} मैसेज")
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("💬 Open Chatbot", use_container_width=True):
+                st.session_state.current_page = "💬 AI Chatbot"
+                st.rerun()
+        with col2:
+            if st.button("📜 Open Script Writer", use_container_width=True):
+                st.session_state.current_page = "📜 AI Script"
+                st.rerun()
+        with col3:
+            if st.button("🎙️ Open Voice Studio", use_container_width=True):
+                st.session_state.current_page = "🎙️ Voice Studio"
+                st.rerun()
+
+        col4, col5 = st.columns(2)
+        with col4:
+            if st.button("🎨 Open Image Generator", use_container_width=True):
+                st.session_state.current_page = "🎨 AI Image"
+                st.rerun()
+        with col5:
+            if st.button("🎬 Open Video Generator", use_container_width=True):
+                st.session_state.current_page = "🎬 Image to Video"
+                st.rerun()
 
     elif st.session_state.current_page == "💬 AI Chatbot":
         st.subheader("💬 AI Chat Assistant")
@@ -147,16 +147,23 @@ else:
             with st.chat_message(msg["role"]):
                 st.write(msg["content"])
 
-        if prompt := st.chat_input("AI से कुछ भी पूछें..."):
+        today_count = get_today_message_count(user_email)
+        limit_reached = (not is_admin) and (today_count >= DAILY_FREE_LIMIT)
+        if limit_reached:
+            st.error(f"⚠️ आपकी आज की फ्री लिमिट समाप्त हो गई है!")
+
+        if prompt := st.chat_input("AI से कुछ भी पूछें...", disabled=limit_reached):
             with st.chat_message("user"):
                 st.write(prompt)
             save_chat_message(user_email, "user", prompt, "user")
             try:
                 groq_client = get_groq_client()
-                response = groq_client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
-                    messages=[{"role": "user", "content": prompt}]
-                )
+                current_messages = [{"role": "system", "content": "You are a helpful AI assistant."}]
+                for m in user_history:
+                    current_messages.append({"role": m["role"], "content": m["content"]})
+                current_messages.append({"role": "user", "content": prompt})
+
+                response = groq_client.chat.completions.create(model="llama-3.1-8b-instant", messages=current_messages)
                 bot_res = response.choices[0].message.content
                 with st.chat_message("assistant"):
                     st.write(bot_res)
@@ -166,35 +173,50 @@ else:
                 st.error(f"Error: {str(e)}")
 
     elif st.session_state.current_page == "📜 AI Script":
-        st.subheader("📜 AI Script Writer")
-        topic = st.text_input("स्क्रिप्ट का टॉपिक दर्ज करें:")
-        if st.button("Generate Script"):
-            if topic:
-                try:
-                    groq_client = get_groq_client()
-                    res = groq_client.chat.completions.create(
-                        model="llama-3.1-8b-instant",
-                        messages=[{"role": "user", "content": f"Write a YouTube script about: {topic}"}]
-                    )
-                    st.write(res.choices[0].message.content)
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
+        try:
+            groq_client = get_groq_client()
+            render_script_page(groq_client)
+        except Exception as e:
+            st.error("API Key नहीं मिली। कृपया Admin panel में सेट करें।")
 
     elif st.session_state.current_page == "🎙️ Voice Studio":
-        st.subheader("🎙️ Voice Studio")
-        st.info("Voice tools coming soon...")
+        render_voice_page()
 
     elif st.session_state.current_page == "🎨 AI Image":
-        st.subheader("🎨 AI Image Generator")
-        st.info("Image generator coming soon...")
+        render_image_page()
 
     elif st.session_state.current_page == "🎬 Image to Video":
-        st.subheader("🎬 Video Generator")
-        st.info("Video generator coming soon...")
+        render_video_page()
 
+    # ⚙️ ADMIN AI ASSISTANT & API KEY MANAGER (Only Visible to Admin)
     elif st.session_state.current_page == "⚙️ Admin AI Assistant" and is_admin:
-        st.subheader("⚙️ Admin Control Panel")
-        groq_input = st.text_input("Groq API Key:", value=st.session_state.active_api_keys["GROQ_KEY"], type="password")
-        if st.button("Save API Key"):
+        st.subheader("⚙️ Admin Control Panel & API Manager")
+        st.write("🔒 **यह सेक्शन केवल आपको (Admin) दिख रहा है। यूज़र्स को यह नहीं दिखेगा।**")
+
+        st.write("---")
+        st.markdown("### 🔑 Live API Key Manager")
+        st.info("आप यहाँ कोई भी नई API Key डाल सकते हैं। पूरा ऐप तुरंत उस नई API का इस्तेमाल करने लगेगा।")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            groq_input = st.text_input("Groq / LLM API Key:", value=st.session_state.active_api_keys["GROQ_KEY"], type="password")
+            gemini_input = st.text_input("Google Gemini API Key:", value=st.session_state.active_api_keys["GEMINI_KEY"], type="password")
+        with col2:
+            openai_input = st.text_input("ChatGPT / OpenAI API Key:", value=st.session_state.active_api_keys["OPENAI_KEY"], type="password")
+            custom_input = st.text_input("Custom Image/VFX Engine API Key:", value=st.session_state.active_api_keys["CUSTOM_VFX_KEY"], type="password")
+
+        if st.button("Save & Update All API Keys 💾", type="primary"):
             st.session_state.active_api_keys["GROQ_KEY"] = groq_input
-            st.success("API Key अपडेट हो गई!")
+            st.session_state.active_api_keys["GEMINI_KEY"] = gemini_input
+            st.session_state.active_api_keys["OPENAI_KEY"] = openai_input
+            st.session_state.active_api_keys["CUSTOM_VFX_KEY"] = custom_input
+            st.success("🎉 सभी API Keys अपडेट हो गईं! यूज़र्स अब आपकी नई API से सर्विस यूज़ कर सकते हैं।")
+
+        st.write("---")
+        st.markdown("### 🤖 Admin AI Studio Assistant")
+        st.write("ऐप के नियमों या प्राइजिंग को बदलने के लिए यहाँ एडिट करें:")
+
+        new_rules = st.text_area("App Rules & Pricing:", st.session_state.pricing_rules, height=100)
+        if st.button("Save Rules Update"):
+            st.session_state.pricing_rules = new_rules
+            st.success("नियम अपडेट हो गए!")
