@@ -231,16 +231,15 @@ else:
             except Exception as e:
                 st.error(f"Error: {str(e)}")
 
-    # 🎨 IMAGE GENERATOR PAGE (With Aspect Ratio & Style)
+    # 🎨 AI IMAGE GENERATOR PAGE (Ultra HD Quality Upgrade)
     elif st.session_state.current_page == "🎨 AI Image Generator":
-        st.subheader("🎨 AI Image Generator")
-        st.write("अपनी कल्पना लिखें, स्टाइल और साइज चुनें और HD फोटो जनरेट करें:")
+        st.subheader("🎨 AI HD Image Generator")
+        st.write("अपनी कल्पना लिखें, स्टाइल और साइज चुनें और **Ultra HD** फोटो जनरेट करें:")
 
         img_prompt = st.text_area("फोटो का विवरण (Prompt):", placeholder="A futuristic cyberpunk city with flying cars at night, highly detailed")
         
         col1, col2 = st.columns(2)
         with col1:
-            # Aspect Ratio Selection
             ratio_option = st.selectbox(
                 "📐 Aspect Ratio (साइज)", 
                 ["Square (1:1)", "Landscape (16:9 - YouTube/PC)", "Portrait (9:16 - Insta/Shorts)"]
@@ -253,25 +252,29 @@ else:
                 width, height = 1024, 1024
 
         with col2:
-            # Art Style Selection
             style_option = st.selectbox(
                 "✨ Art Style (स्टाइल)", 
-                ["None (Normal)", "Cinematic (मूवी जैसा)", "Anime / Manga (एनीमे)", "3D Pixar / Cartoon", "Digital Art", "Oil Painting", "Cyberpunk"]
+                ["Cinematic (मूवी जैसा)", "Realistic Photo (असली फोटो)", "Anime / Manga", "3D Pixar / Cartoon", "Digital Art", "Cyberpunk", "None (Normal)"]
             )
 
-        if st.button("Generate Image 🚀", type="primary", use_container_width=True):
+        if st.button("Generate HD Image 🚀", type="primary", use_container_width=True):
             if img_prompt.strip():
-                with st.spinner("AI आपकी मनपसंद इमेज तैयार कर रहा है..."):
-                    # Style को प्रॉम्प्ट में जोड़ना ताकि वैसी ही फोटो बने
-                    final_prompt = img_prompt
+                with st.spinner("AI 4K Ultra HD में आपकी फोटो तैयार कर रहा है..."):
+                    # Quality Booster Tags
+                    quality_boosters = "masterpiece, 8k resolution, highly detailed, sharp focus, professional photography"
+                    
                     if style_option != "None (Normal)":
-                        final_prompt += f", {style_option} style"
+                        final_prompt = f"{img_prompt}, {style_option} style, {quality_boosters}"
+                    else:
+                        final_prompt = f"{img_prompt}, {quality_boosters}"
 
                     encoded_prompt = urllib.parse.quote(final_prompt)
-                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&nologo=true"
                     
-                    st.image(image_url, caption=f"Prompt: {final_prompt} | Size: {width}x{height}", use_column_width=True)
-                    st.success("इमेज सफलतापर्वक तैयार है! फोटो पर लॉन्ग प्रेस करके डाउनलोड कर सकते हैं।")
+                    # Flux Model + HD Parameters
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model=flux&enhance=true&nologo=true"
+                    
+                    st.image(image_url, caption=f"Prompt: {img_prompt}", use_column_width=True)
+                    st.success("✨ HD इमेज सफलतापूर्वक तैयार है! फोटो पर लॉन्ग प्रेस करके डाउनलोड कर सकते हैं।")
             else:
                 st.warning("कृपया पहले फोटो का विवरण (Prompt) दर्ज करें!")
 
@@ -293,7 +296,7 @@ else:
             
             try:
                 groq_client = get_groq_client(0)
-                current_messages = [{"role": "system", "content": sys_prompt}]
+                current_messages = [{"role": "system", "content": "You are a helpful assistant."}]
                 for m in admin_history:
                     current_messages.append({"role": m["role"], "content": m["content"]})
                 current_messages.append({"role": "user", "content": prompt})
