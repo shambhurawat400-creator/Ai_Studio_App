@@ -44,33 +44,41 @@ def render_image_page():
         if img_prompt.strip():
             with st.spinner(f"🎨 {style_option} स्टाइल और {quality_mode} क्वालिटी में इमेज रेंडर हो रही है..."):
                 
+                # Face sharpness enhancers added safely to maintain old structure
+                face_enhancers = "extremely detailed face, sharp focus on facial features and eyes, clear expression, high resolution"
+                
                 style_tags_map = {
-                    "Cinematic": "cinematic film still, dramatic lighting, depth of field, 8k, photorealistic",
-                    "Realistic": "hyper-realistic, highly detailed, photorealistic, sharp focus, 8k resolution",
-                    "Anime": "high quality anime art, studio ghibli style, vibrant colors, detailed line art",
-                    "Pixar": "3d disney pixar style animation, cute, vibrant lighting, unreal engine 5 render",
-                    "3D": "octane render, 3d blender art, volumetric lighting, highly detailed",
-                    "2D": "classic 2d vector art, clean lines, professional illustration",
-                    "Cartoon": "fun cartoon style, bold outlines, bright expressive colors",
-                    "Fantasy": "magical fantasy art, ethereal glow, mythical environment, epic composition",
-                    "Sci-Fi": "futuristic sci-fi concept art, cyberpunk neon lights, high-tech details",
-                    "Watercolor": "soft watercolor painting style, artistic brush strokes, pastel paper texture",
-                    "Oil Painting": "classic oil painting on canvas, rich textured brushwork, masterpiece"
+                    "Cinematic": f"cinematic film still, dramatic lighting, depth of field, 8k, photorealistic, {face_enhancers}",
+                    "Realistic": f"hyper-realistic, highly detailed, photorealistic, sharp focus, 8k resolution, {face_enhancers}",
+                    "Anime": f"high quality anime art, studio ghibli style, vibrant colors, detailed line art, {face_enhancers}",
+                    "Pixar": f"3d disney pixar style animation, cute, vibrant lighting, unreal engine 5 render, {face_enhancers}",
+                    "3D": f"octane render, 3d blender art, volumetric lighting, highly detailed, {face_enhancers}",
+                    "2D": f"classic 2d vector art, clean lines, professional illustration, clear face",
+                    "Cartoon": f"fun cartoon style, bold outlines, bright expressive colors, clear face",
+                    "Fantasy": f"magical fantasy art, ethereal glow, mythical environment, epic composition, {face_enhancers}",
+                    "Sci-Fi": f"futuristic sci-fi concept art, cyberpunk neon lights, high-tech details, {face_enhancers}",
+                    "Watercolor": f"soft watercolor painting style, artistic brush strokes, pastel paper texture, clear face",
+                    "Oil Painting": f"classic oil painting on canvas, rich textured brushwork, masterpiece, clear face"
                 }
 
-                current_style_tag = style_tags_map.get(style_option, "masterpiece, 8k")
+                current_style_tag = style_tags_map.get(style_option, f"masterpiece, 8k, {face_enhancers}")
                 clean_input = img_prompt.strip()
                 final_prompt = f"{clean_input}, {current_style_tag}"
                 
+                # Handling negative prompt correctly including face blur protection
+                default_neg = "blurry face, deformed features, low quality, bad anatomy, ugly"
                 if neg_prompt.strip():
-                    final_prompt += f" negative_prompt: {neg_prompt.strip()}"
+                    final_neg = f"{neg_prompt.strip()}, {default_neg}"
+                else:
+                    final_neg = default_neg
 
                 encoded_prompt = urllib.parse.quote(final_prompt)
+                encoded_neg = urllib.parse.quote(final_neg)
                 
                 generated_urls = []
                 for i in range(num_images):
                     seed_val = datetime.now().microsecond + i
-                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true"
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}"
                     generated_urls.append(image_url)
 
                 st.success(f"✨ सफलतापूर्वक {num_images} इमेज तैयार हो गई हैं!")
