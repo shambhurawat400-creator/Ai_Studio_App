@@ -113,7 +113,7 @@ else:
             
             try:
                 response = groq_client.chat.completions.create(
-                    model="llama3-8b-8192",
+                    model="llama-3.1-8b-instant",
                     messages=[{"role": "system", "content": sys_prompt}] + st.session_state.admin_messages
                 )
                 bot_res = response.choices[0].message.content
@@ -153,7 +153,7 @@ else:
 
             try:
                 response = groq_client.chat.completions.create(
-                    model="llama3-8b-8192",
+                    model="llama-3.1-8b-instant",
                     messages=[{"role": "system", "content": "You are a helpful and smart AI assistant."}] + st.session_state.messages
                 )
                 bot_res = response.choices[0].message.content
