@@ -3,19 +3,27 @@ from supabase import create_client, Client
 from groq import Groq
 from datetime import date
 import time
-
-# --- GUARANTEED FIX FOR ALL MODULE IMPORTS ---
 import sys, os
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
-sys.path.insert(0, os.path.dirname(current_dir))
 
-# Import all custom separate modules
-from auth import handle_login_session, render_auth_ui, logout_user
-from image_gen import render_image_page
-from video_gen import render_video_page
-from voice_tools import render_voice_page
-from script_gen import render_script_page
+# --- ABSOLUTE PATH FIX FOR ALL SUBFOLDERS ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+sys.path.append(os.path.join(BASE_DIR, "ai_studio_app"))
+sys.path.append(os.path.dirname(BASE_DIR))
+
+# Safe Import Engine
+try:
+    from auth import handle_login_session, render_auth_ui, logout_user
+    from image_gen import render_image_page
+    from video_gen import render_video_page
+    from voice_tools import render_voice_page
+    from script_gen import render_script_page
+except ImportError:
+    from ai_studio_app.auth import handle_login_session, render_auth_ui, logout_user
+    from ai_studio_app.image_gen import render_image_page
+    from ai_studio_app.video_gen import render_video_page
+    from ai_studio_app.voice_tools import render_voice_page
+    from ai_studio_app.script_gen import render_script_page
 
 # Page Configuration
 st.set_page_config(page_title="AI Studio Dashboard", page_icon="🤖", layout="wide")
