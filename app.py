@@ -1,12 +1,12 @@
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 import streamlit as st
 from supabase import create_client, Client
 from groq import Groq
 from datetime import date
 import time
+
+# --- CRITICAL FIX FOR MODULE IMPORTS ---
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import all custom separate modules
 from auth import handle_login_session, render_auth_ui, logout_user
