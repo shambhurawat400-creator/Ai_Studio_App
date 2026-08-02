@@ -3,23 +3,31 @@ import urllib.parse
 from datetime import datetime
 
 def render_image_page():
-    st.subheader("🎨 Pro Text-to-Image Studio")
-    st.write("सभी पसंदीदा स्टाइल्स, शार्प आँखों और ऑटोमैटिक शानदार क्वालिटी के साथ इमेज बनाएं:")
+    st.subheader("🎨 Pro Storybook & Animation Studio")
+    st.write("कहानी वाली शानदार 2D इलस्ट्रेशन और बेहतरीन क्वालिटी की तस्वीरें मुफ्त में बनाएं:")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="An Indian old village woman near a haunted well...")
-    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry eyes, dark shadows, low quality, bad anatomy")
+    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="An old grandmother, a sad man reading a letter, and a young girl sitting on a bed in a village home, emotional scene...")
+    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry, 3d render, photorealistic, dark shadows, low quality")
 
-    # --- All Original Styles Restored ---
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
-        "Cinematic", "Realistic", "Anime", "Pixar", "3D", 
-        "2D", "Cartoon", "Fantasy", "Sci-Fi", 
-        "Watercolor", "Oil Painting"
+        "Indian Storybook Illustration (बेस्ट क्वालिटी)",
+        "2D Cartoon / Animation",
+        "Cinematic", 
+        "Realistic", 
+        "Anime", 
+        "Pixar", 
+        "3D", 
+        "Cartoon", 
+        "Fantasy", 
+        "Sci-Fi", 
+        "Watercolor", 
+        "Oil Painting"
     ])
 
     col1, col2, col3 = st.columns(3)
@@ -34,39 +42,41 @@ def render_image_page():
             width, height = 1024, 1024
 
     with col2:
-        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (4K)", "HD Quality (1080p)", "Standard"])
+        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (High Detail)", "HD Quality (1080p)", "Standard"])
         if "Ultra HD" in quality_mode:
             width, height = int(width * 1.25), int(height * 1.25)
 
     with col3:
         num_images = st.slider("🔢 Number of Images", 1, 4, 1)
 
-    if st.button("🚀 Generate Images Now", type="primary", use_container_width=True):
+    if st.button("🚀 Generate High Quality Images", type="primary", use_container_width=True):
         if img_prompt.strip():
-            with st.spinner(f"🎨 {style_option} स्टाइल और बेहतरीन क्वालिटी में इमेज रेंडर हो रही है..."):
+            with st.spinner(f"🎨 {style_option} स्टाइल में शानदार क्वालिटी की इमेज तैयार हो रही है..."):
                 
-                # Universal auto-enhancement for eyes, clarity and vibrant colors across all styles
-                auto_enhancers = "extremely detailed sharp eyes, crystal clear pupils, perfectly focused background, vibrant rich colors, stunning visual effects, 8k resolution, flawless clarity"
+                # Special storytelling illustration tags to match the reference image quality
+                story_art_tags = "detailed storybook illustration, expressive clear faces, warm lighting, clearly visible indoor background, beautiful detailed room, masterpiece, 8k resolution"
                 
                 style_tags_map = {
-                    "Cinematic": f"cinematic film still, dramatic lighting, depth of field, 8k, photorealistic, {auto_enhancers}",
-                    "Realistic": f"hyper-realistic, highly detailed, photorealistic, sharp focus, 8k resolution, {auto_enhancers}",
-                    "Anime": f"high quality anime art, studio ghibli style, vibrant colors, detailed line art, {auto_enhancers}",
-                    "Pixar": f"3d disney pixar style animation, cute, vibrant lighting, unreal engine 5 render, {auto_enhancers}",
-                    "3D": f"octane render, 3d blender art, volumetric lighting, highly detailed, {auto_enhancers}",
-                    "2D": f"classic 2d vector art, clean lines, professional illustration, {auto_enhancers}",
-                    "Cartoon": f"fun cartoon style, bold outlines, bright expressive colors, {auto_enhancers}",
-                    "Fantasy": f"magical fantasy art, ethereal glow, mythical environment, epic composition, {auto_enhancers}",
-                    "Sci-Fi": f"futuristic sci-fi concept art, cyberpunk neon lights, high-tech details, {auto_enhancers}",
-                    "Watercolor": f"soft watercolor painting style, artistic brush strokes, pastel paper texture, {auto_enhancers}",
-                    "Oil Painting": f"classic oil painting on canvas, rich textured brushwork, masterpiece, {auto_enhancers}"
+                    "Indian Storybook Illustration (बेस्ट क्वालिटी)": f"classic Indian storybook vector illustration, detailed line art, warm soft lighting, beautifully drawn characters and room background, {story_art_tags}",
+                    "2D Cartoon / Animation": f"professional 2d animation cell, clean outlines, vibrant lighting, {story_art_tags}",
+                    "Cinematic": f"cinematic story frame, warm ambient lighting, highly detailed background, {story_art_tags}",
+                    "Realistic": f"hyper-realistic painting, detailed textures, warm lighting, {story_art_tags}",
+                    "Anime": f"high quality anime art, expressive eyes, beautiful background, {story_art_tags}",
+                    "Pixar": f"3d disney pixar style animation, cute, vibrant lighting, {story_art_tags}",
+                    "3D": f"octane render, 3d art, volumetric lighting, {story_art_tags}",
+                    "2D": f"classic 2d vector art, clean lines, professional illustration, {story_art_tags}",
+                    "Cartoon": f"fun cartoon style, bold outlines, bright expressive colors, {story_art_tags}",
+                    "Fantasy": f"magical fantasy art, ethereal glow, detailed environment, {story_art_tags}",
+                    "Sci-Fi": f"futuristic sci-fi art, high-tech details, {story_art_tags}",
+                    "Watercolor": f"soft watercolor painting style, artistic brush strokes, pastel paper texture, {story_art_tags}",
+                    "Oil Painting": f"classic oil painting on canvas, rich textured brushwork, masterpiece, {story_art_tags}"
                 }
 
-                current_style_tag = style_tags_map.get(style_option, f"masterpiece, 8k, {auto_enhancers}")
+                current_style_tag = style_tags_map.get(style_option, story_art_tags)
                 clean_input = img_prompt.strip()
                 final_prompt = f"{clean_input}, {current_style_tag}"
                 
-                default_neg = "blurry eyes, closed eyes, dark shadows on face, dull colors, low quality, bad anatomy, ugly"
+                default_neg = "darkness, black image, hidden faces, blurry eyes, low quality, bad anatomy, 3d realistic photo"
                 if neg_prompt.strip():
                     final_neg = f"{neg_prompt.strip()}, {default_neg}"
                 else:
@@ -78,10 +88,11 @@ def render_image_page():
                 generated_urls = []
                 for i in range(num_images):
                     seed_val = datetime.now().microsecond + i
+                    # Using 'flux' model with explicit prompt adjustments for best free output
                     image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}"
                     generated_urls.append(image_url)
 
-                st.success(f"✨ सफलतापूर्वक {num_images} इमेज तैयार हो गई हैं!")
+                st.success(f"✨ बेहतरीन क्वालिटी की {num_images} इमेज तैयार हैं!")
 
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
