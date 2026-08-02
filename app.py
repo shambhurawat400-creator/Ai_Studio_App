@@ -1,18 +1,20 @@
+import sys
+import os
+from pathlib import Path
+
+# --- THE ULTIMATE ROOT PATH FIX ---
+file_path = Path(__file__).resolve()
+parent_dir = file_path.parent
+sys.path.insert(0, str(parent_dir))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import streamlit as st
 from supabase import create_client, Client
 from groq import Groq
 from datetime import date
 import time
-import sys
-from pathlib import Path
 
-# --- THE ULTIMATE ROOT PATH FIX ---
-# It dynamically gets the exact directory of app.py and inserts it into sys.path
-file_path = Path(__file__).resolve()
-parent_dir = file_path.parent
-sys.path.insert(0, str(parent_dir))
-
-# Import all custom separate modules
+# Import all custom separate modules safely
 from auth import handle_login_session, render_auth_ui, logout_user
 from image_gen import render_image_page
 from video_gen import render_video_page
