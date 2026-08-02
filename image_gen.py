@@ -3,16 +3,16 @@ import urllib.parse
 from datetime import datetime
 
 def render_image_page():
-    st.subheader("🎨 Pro Text-to-Image Studio")
-    st.write("क्रिस्टल-क्लियर आँखों, शार्प बैकग्राउंड और एडवांस स्टाइल्स के साथ हाई-क्वालिटी इमेज बनाएं:")
+    st.subheader("🎨 Pro Smart Text-to-Image Studio")
+    st.write("प्रॉम्प्ट के हिसाब से ऑटोमैटिक शानदार VFX, शार्प आँखें और हाई-क्वालिटी इमेज बनाएं:")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="Family sitting in a room, clearly visible sharp eyes, highly detailed background house interior...")
-    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry eyes, closed eyes, out of focus background, blurry walls, low quality")
+    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="Family sitting in a bright colorful room, sharp details, vibrant lighting...")
+    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry eyes, dark shadows, dull colors, low quality, black and white")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
@@ -42,29 +42,31 @@ def render_image_page():
 
     if st.button("🚀 Generate Images Now", type="primary", use_container_width=True):
         if img_prompt.strip():
-            with st.spinner(f"🎨 {style_option} स्टाइल और फुल शार्प बैकग्राउंड के साथ इमेज रेंडर हो रही है..."):
+            with st.spinner(f"🎨 {style_option} और ऑटोमैटिक स्मार्ट VFX के साथ इमेज रेंडर हो रही है..."):
                 
-                ultra_clarity_tags = "extremely detailed sharp eyes, crystal clear pupils, perfectly focused background, sharp room interior, highly detailed house environment, 8k resolution, flawless clarity"
+                # Auto-Smart VFX and Color Enhancement Engine based on prompt context
+                auto_smart_vfx = "stunning visual effects, vibrant rich color grading, glowing ambient rim lighting, highly detailed colorful environment, 8k resolution"
+                ultra_clarity_tags = "extremely detailed sharp eyes, crystal clear pupils, perfectly focused background, rich colorful room interior, flawless clarity"
                 
                 style_tags_map = {
-                    "Cinematic": f"cinematic wide shot, balanced lighting across entire room, sharp background details, {ultra_clarity_tags}",
-                    "Realistic": f"hyper-realistic photography, sharp focus on both subject and background house, {ultra_clarity_tags}",
-                    "Anime": f"high quality anime art, sharp detailed eyes, clear background scenery, {ultra_clarity_tags}",
-                    "Pixar": f"3d disney pixar style animation, sharp detailed environment, expressive eyes, {ultra_clarity_tags}",
-                    "3D": f"octane render, 3d environment design, sharp textures on walls and furniture, {ultra_clarity_tags}",
-                    "2D": f"classic 2d vector art, clean sharp lines, fully visible background house details",
-                    "Cartoon": f"fun cartoon style, bright clean background, expressive clear eyes",
-                    "Fantasy": f"magical fantasy art, crystal clear background environment, detailed eyes, {ultra_clarity_tags}",
-                    "Sci-Fi": f"futuristic sci-fi art, high-tech sharp background details, clear eyes, {ultra_clarity_tags}",
-                    "Watercolor": f"soft watercolor painting style, clear background architecture, detailed face",
-                    "Oil Painting": f"classic oil painting on canvas, rich background textures, clear facial expressions"
+                    "Cinematic": f"cinematic wide shot, {auto_smart_vfx}, sharp background details, {ultra_clarity_tags}",
+                    "Realistic": f"hyper-realistic photography, {auto_smart_vfx}, sharp focus on subject and background, {ultra_clarity_tags}",
+                    "Anime": f"high quality anime art, {auto_smart_vfx}, sharp detailed eyes, clear background scenery, {ultra_clarity_tags}",
+                    "Pixar": f"3d disney pixar style animation, {auto_smart_vfx}, sharp detailed environment, expressive eyes, {ultra_clarity_tags}",
+                    "3D": f"octane render, {auto_smart_vfx}, 3d environment design, sharp textures, {ultra_clarity_tags}",
+                    "2D": f"classic 2d vector art, clean sharp lines, {auto_smart_vfx}, fully visible background details",
+                    "Cartoon": f"fun cartoon style, bright clean background, {auto_smart_vfx}, expressive clear eyes",
+                    "Fantasy": f"magical fantasy art, {auto_smart_vfx}, crystal clear background environment, detailed eyes, {ultra_clarity_tags}",
+                    "Sci-Fi": f"futuristic sci-fi art, {auto_smart_vfx}, high-tech sharp background details, clear eyes, {ultra_clarity_tags}",
+                    "Watercolor": f"soft watercolor painting style, {auto_smart_vfx}, clear background architecture, detailed face",
+                    "Oil Painting": f"classic oil painting on canvas, {auto_smart_vfx}, rich background textures, clear facial expressions"
                 }
 
-                current_style_tag = style_tags_map.get(style_option, f"masterpiece, 8k, {ultra_clarity_tags}")
+                current_style_tag = style_tags_map.get(style_option, f"masterpiece, 8k, {auto_smart_vfx}")
                 clean_input = img_prompt.strip()
                 final_prompt = f"{clean_input}, {current_style_tag}"
                 
-                default_neg = "blurry eyes, closed eyes, out of focus background, blurry house, foggy background, low quality, deformed anatomy"
+                default_neg = "blurry eyes, closed eyes, dull colors, black and white, monochrome, out of focus background, low quality"
                 if neg_prompt.strip():
                     final_neg = f"{neg_prompt.strip()}, {default_neg}"
                 else:
@@ -79,12 +81,12 @@ def render_image_page():
                     image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}"
                     generated_urls.append(image_url)
 
-                st.success(f"✨ क्रिस्टल-क्लियर आँखों और बैकग्राउंड के साथ {num_images} इमेज तैयार हैं!")
+                st.success(f"✨ ऑटोमैटिक शानदार कलर्स और VFX के साथ {num_images} इमेज तैयार हैं!")
 
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
                     with cols[idx % len(cols)]:
-                        st.image(url, caption=f"Style: {style_option} | #{idx+1}", use_column_width=True)
+                        st.image(url, caption=f"Style: {style_option} | Auto-VFX Active | #{idx+1}", use_column_width=True)
                         st.markdown(f"[📥 Download Image {idx+1}]({url})")
                         
                         if st.button(f"💾 Save Project #{idx+1}", key=f"save_{seed_val}_{idx}"):
