@@ -9,20 +9,20 @@ def run_async(coro):
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            # If a loop is already running, create a new task or use run_until_complete in a safe way
             return asyncio.run(coro)
         else:
             return loop.run_until_complete(coro)
     except RuntimeError:
         return asyncio.run(coro)
 
-async def generate_edge_audio(text, voice_name, output_file):
-    communicate = edge_tts.Communicate(text, voice_name)
+async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_str="+0%", pitch_str="+0Hz"):
+    # Edge-TTS supports SSML-like rate and pitch adjustments to reflect emotions
+    communicate = edge_tts.Communicate(text, voice_name, rate=rate_str, pitch=pitch_str)
     await communicate.save(output_file)
 
 def render_voice_page():
     st.subheader("🎙️ AI Master Voice & Character Studio (All-in-One Pro)")
-    st.write("बिना किसी पैसे या API Key के, सभी कैरेक्टर और अल्ट्रा-रियलिस्टिक नैचुरल आवाज़ों का उपयोग करें:")
+    st.write("बिना किसी पैसे या API Key के, सभी कैरेक्टर, वॉइस क्लोनिंग और इमोशन ट्यूनिंग का उपयोग करें:")
 
     # --- Initialize Permanent Saved Voices in Session State ---
     if "saved_cloned_voices" not in st.session_state:
@@ -37,13 +37,23 @@ def render_voice_page():
     
     if st.button("💾 Save Voice Profile"):
         if uploaded_audio is not None and cloned_name_input.strip():
-            st.session_state.saved_cloned_voices[cloned_name_input.strip()] = uploaded_audio.name
-            st.success(f"🎉 शानदार! '{cloned_name_input.strip}' प्रोफाइल सफलतापूर्वक सेव हो गई है!")
+            # Save file locally so it can be previewed
+            os.makedirs("cloned_voices", exist_ok=True)
+            saved_path = os.path.join("cloned_voices", uploaded_audio.name)
+            with open(saved_path, "wb") as f:
+                f.write(uploaded_audio.getbuffer())
+            
+            st.session_state.saved_cloned_voices[cloned_name_input.strip()] = saved_path
+            st.success(f"🎉 शानदार! '{cloned_name_input.strip}' प्रोफाइल सफलतापूर्वक सेव और ऐड हो गई है!")
         else:
             st.warning("⚠️ कृपया पहले ऑडियो फ़ाइल अपलोड करें और उसका नाम सही से दर्ज करें!")
 
+    # Display preview for uploaded/saved custom voices
     if st.session_state.saved_cloned_voices:
         st.info(f"📂 कुल सेव की गई कस्टम आवाज़ें: {len(st.session_state.saved_cloned_voices)}")
+        selected_preview_custom = st.selectbox("🎧 अपनी सेव की गई क्लोन आवाज़ सुनें:", list(st.session_state.saved_cloned_voices.keys()))
+        if selected_preview_custom:
+            st.audio(st.session_state.saved_cloned_voices[selected_preview_custom])
 
     # --- 2. ADVANCED TEXT-TO-SPEECH CHARACTER STUDIO ---
     st.markdown("---")
@@ -91,13 +101,14 @@ def render_voice_page():
             preview_filename = f"preview_{config['voice']}.mp3"
             
             if not os.path.exists(preview_filename):
-                run_async(generate_edge_audio(config["sample"], config["voice"], preview_filename))
+                run_async(generate_edge_audio_with_emotion(config["sample"], config["voice"], preview_filename))
             
             st.markdown(f"🔊 **चयनित कैरेक्टर का नैचुरल प्रीव्यू:**")
             st.audio(preview_filename)
         except Exception:
             pass
 
+    # --- EMOTION SELECTION CONTROLS ---
     audio_emotion = st.selectbox("⚡ भाव / टोन (Tone & Expression):", [
         "Normal / Clear & Natural (सामान्य और साफ़)",
         "Storytelling / Emotional (कहानी वाला भावुक अंदाज़)",
@@ -118,15 +129,30 @@ def render_voice_page():
                         config = voice_profiles_map.get(selected_character, {"voice": "hi-IN-SwaraNeural"})
                         voice_id = config["voice"]
 
+                    # Map user emotion selection to actual Edge-TTS rate and pitch adjustments
+                    rate_val = f"{int((speed_option - 1.0) * 100)}%"
+                    if speed_option < 1.0:
+                        rate_val = f"-{int((1.0 - speed_option) * 100)}%"
+                    else:
+                        rate_val = f"+{int((speed_option - 1.0) * 100)}%"
+
+                    pitch_val = "+0Hz"
+                    if "डरावना" in audio_emotion or "गंभीर" in audio_emotion:
+                        pitch_val = "-4Hz"  # Deeper pitch for scary/mysterious
+                    elif "भावुक" in audio_emotion:
+                        pitch_val = "-2Hz"  # Slightly lower emotional pitch
+                    elif "जोशीला" in audio_emotion or "एनर्जेटिक" in audio_emotion:
+                        pitch_val = "+3Hz"  # Higher energetic pitch
+
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
 
-                    # Generate using Safe Async Runner
-                    run_async(generate_edge_audio(audio_text, voice_id, filename))
+                    # Generate using Emotion & Speed parameters
+                    run_async(generate_edge_audio_with_emotion(audio_text, voice_id, filename, rate_str=rate_val, pitch_str=pitch_val))
 
                     st.success(f"🎉 ऑडियो सफलतापूर्वक जनरेट हो गया!")
                     st.audio(filename)
-                    st.info("💡 आप इस ऑडियो प्लेयर पर दिए गए तीन डॉट्स (...) पर क्लिक करके इसे आसानी से डाउनलोड कर सकते हैं।")
+                    st.info("💡 आप इस ऑडियो प्लेयर पर दिए गए तीन डॉट्स (...) पर क्लिक करके इसे आसानी से डाउनलोड कर सकते हैं।्न")
                     
                 except Exception as e:
                     st.error(f"🚨 ऑडियो जनरेशन में गड़बड़: {e}")
