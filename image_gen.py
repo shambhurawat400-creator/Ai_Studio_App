@@ -1,33 +1,25 @@
 import streamlit as st
 import urllib.parse
 from datetime import datetime
+import time
 
 def render_image_page():
-    st.subheader("🎨 Pro Text-to-Image Studio")
-    st.write("आपके लिखे गए प्रॉम्प्ट के अनुसार सटीक और बेहतरीन क्वालिटी की इमेज बनाएं:")
+    st.subheader("🎨 Pro Text-to-Image Studio with Smart VFX")
+    st.write("सुपर-फास्ट लोडिंग, ऑटोमैटिक VFX और शार्प क्वालिटी के साथ इमेज बनाएं:")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="Mohan shining a powerful flashlight deep inside the ancient dry well while others watch...")
-    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry, distorted, low quality, bad anatomy")
+    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="A magical forest with glowing lights, vibrant colors, cinematic VFX...")
+    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry, dark, dull colors, deformed")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
-        "Cinematic Horror / Animation",
-        "Indian Storybook Illustration",
-        "Realistic", 
-        "Anime", 
-        "Pixar", 
-        "3D", 
-        "2D", 
-        "Cartoon", 
-        "Fantasy", 
-        "Sci-Fi", 
-        "Watercolor", 
-        "Oil Painting"
+        "Cinematic", "Realistic", "Anime", "Pixar", "3D", 
+        "2D", "Cartoon", "Fantasy", "Sci-Fi", 
+        "Watercolor", "Oil Painting"
     ])
 
     col1, col2, col3 = st.columns(3)
@@ -51,31 +43,44 @@ def render_image_page():
 
     if st.button("🚀 Generate Images Now", type="primary", use_container_width=True):
         if img_prompt.strip():
-            with st.spinner(f"🎨 आपके प्रॉम्प्ट के अनुसार इमेज रेंडर हो रही है..."):
+            with st.spinner(f"🎨 {style_option} स्टाइल और स्मार्ट VFX के साथ इमेज रेंडर हो रही है..."):
                 
-                # Minimal clean style suffix so AI focuses primarily on user prompt
-                style_suffix_map = {
-                    "Cinematic Horror / Animation": "cinematic horror animation style, highly detailed, 8k",
-                    "Indian Storybook Illustration": "indian storybook illustration style, detailed, 8k",
-                    "Realistic": "hyper-realistic, highly detailed, 8k resolution",
-                    "Anime": "high quality anime style, detailed art",
-                    "Pixar": "3d disney pixar animation style",
-                    "3D": "octane render, 3d blender art, highly detailed",
-                    "2D": "classic 2d vector art, clean lines",
-                    "Cartoon": "fun cartoon style, bold outlines",
-                    "Fantasy": "magical fantasy art style",
-                    "Sci-Fi": "futuristic sci-fi concept art",
-                    "Watercolor": "soft watercolor painting style",
-                    "Oil Painting": "classic oil painting on canvas"
+                # --- Hyper-Fast Progress Bar Simulation (0.5 seconds) ---
+                progress_bar = st.progress(0)
+                for percent_complete in range(100):
+                    time.sleep(0.005) # Fast speed: 100 steps * 0.005s = 0.5 seconds
+                    progress_bar.progress(percent_complete + 1)
+                
+                progress_bar.empty() # Remove progress bar after completion
+                # --- End of Progress Bar ---
+
+                # --- Smart VFX & Clarity Enhancement ---
+                smart_vfx = "stunning visual effects, vibrant rich color grading, dramatic lighting, professional VFX, masterpiece"
+                clarity_boost = "extremely detailed, sharp focus, high definition, 8k resolution"
+                
+                style_tags_map = {
+                    "Cinematic": f"cinematic film still, {smart_vfx}, {clarity_boost}, depth of field",
+                    "Realistic": f"hyper-realistic, {smart_vfx}, {clarity_boost}, photorealistic, sharp focus",
+                    "Anime": f"high quality anime art, studio ghibli style, vibrant colors, {smart_vfx}",
+                    "Pixar": f"3d disney pixar style animation, cute, {smart_vfx}, vibrant lighting",
+                    "3D": f"octane render, 3d blender art, volumetric lighting, {smart_vfx}",
+                    "2D": f"classic 2d vector art, clean lines, professional illustration, {smart_vfx}",
+                    "Cartoon": f"fun cartoon style, bold outlines, bright expressive colors, {smart_vfx}",
+                    "Fantasy": f"magical fantasy art, ethereal glow, {smart_vfx}, mythical environment",
+                    "Sci-Fi": f"futuristic sci-fi concept art, cyberpunk neon lights, {smart_vfx}",
+                    "Watercolor": f"soft watercolor painting style, artistic brush strokes, {smart_vfx}",
+                    "Oil Painting": f"classic oil painting on canvas, rich textured brushwork, {smart_vfx}"
                 }
 
-                chosen_suffix = style_suffix_map.get(style_option, "masterpiece, 8k")
-                
-                # Directly using user prompt and adding chosen style smoothly
+                current_style_tag = style_tags_map.get(style_option, f"masterpiece, {smart_vfx}, {clarity_boost}")
                 clean_input = img_prompt.strip()
-                final_prompt = f"{clean_input}, {chosen_suffix}"
+                final_prompt = f"{clean_input}, {current_style_tag}"
                 
-                final_neg = neg_prompt.strip() if neg_prompt.strip() else "blurry, low quality, deformed, bad anatomy"
+                default_neg = "blurry, dark, dull colors, deformed, bad anatomy, ugly"
+                if neg_prompt.strip():
+                    final_neg = f"{neg_prompt.strip()}, {default_neg}"
+                else:
+                    final_neg = default_neg
 
                 encoded_prompt = urllib.parse.quote(final_prompt)
                 encoded_neg = urllib.parse.quote(final_neg)
@@ -83,11 +88,11 @@ def render_image_page():
                 generated_urls = []
                 for i in range(num_images):
                     seed_val = datetime.now().microsecond + i
-                    # Using flux model with exact user prompt mapping
+                    # Using 'flux' model for best quality and ensuring VFX is applied
                     image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}"
                     generated_urls.append(image_url)
 
-                st.success(f"✨ सफलतापूर्वक {num_images} इमेज तैयार हो गई हैं!")
+                st.success(f"✨ शानदार VFX और {num_images} इमेज तैयार हैं!")
 
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
@@ -117,7 +122,7 @@ def render_image_page():
                 st.markdown(f"[🔗 Direct Link]({proj['url']})")
                 st.write("---")
         else:
-            st.info("कोई प्रोजेक्ट सेव नहीं है।")
+            st.info("कोई प्रोजेक्ट सेव नहीं है。")
 
     with tab2:
         st.subheader("पिछली जनरेट की गई इमेजेस (History)")
@@ -127,4 +132,4 @@ def render_image_page():
                 st.image(hist['url'], width=250)
                 st.write("---")
         else:
-            st.info("इतिहास (History) खाली है।")
+            st.info("इतिहास (History) खाली है。")
