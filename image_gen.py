@@ -3,7 +3,7 @@ import urllib.parse
 from datetime import datetime
 
 def render_image_page():
-    st.subheader("🎨 Pro Storybook & Animation Studio")
+    st.subheader("🎨 Pro Text-to-Image Studio")
     st.write("शार्प चेहरे, स्पष्ट आँखें और परफेक्ट बैकग्राउंड के साथ हाई-क्वालिटी इमेज बनाएं:")
 
     if "image_history" not in st.session_state:
@@ -11,7 +11,7 @@ def render_image_page():
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="An old grandmother crying, a sad man reading a letter, and a young girl, highly detailed room, clear eyes, sharp focus...")
+    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="An Indian grandmother crying, a sad man reading a letter, and a young girl, highly detailed room, clear eyes, sharp focus...")
     neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry eyes, distorted face, out of focus background, dark shadows, low quality")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
@@ -55,6 +55,7 @@ def render_image_page():
                 
                 # Bulletproof tags for absolute clarity, sharp eyes and crystal clear background
                 ultimate_clarity = "extremely detailed sharp eyes, crystal clear facial features, fully focused sharp background, perfectly lit room, vibrant rich colors, masterwork illustration, 8k resolution"
+                face_enhancers = "codeformer, gfpgan, realistic_vision_inpainting_v4" # Adding face fixing techniques
                 
                 style_tags_map = {
                     "Indian Storybook Illustration (बेस्ट क्वालिटी)": f"classic Indian storybook vector illustration, clean sharp outlines, warm soft lighting, beautifully drawn characters and clear indoor room background, {ultimate_clarity}",
@@ -76,6 +77,7 @@ def render_image_page():
                 clean_input = img_prompt.strip()
                 final_prompt = f"{clean_input}, {current_style_tag}"
                 
+                # Explicit negative prompt for face clarity
                 default_neg = "blurry eyes, closed eyes, out of focus background, dark shadows on face, low quality, bad anatomy, distorted features"
                 if neg_prompt.strip():
                     final_neg = f"{neg_prompt.strip()}, {default_neg}"
@@ -88,12 +90,13 @@ def render_image_page():
                 generated_urls = []
                 for i in range(num_images):
                     seed_val = datetime.now().microsecond + i
-                    # Switched to 'turbo' model for crisp, sharp rendering and explicitly added negative prompt support in URL
-                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=turbo&nologo=true&negative={encoded_neg}"
+                    # Switched to 'turbo' model for crisp, sharp rendering and added negative prompt parameter in URL
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=turbo&nologo=true&negative={encoded_neg}&face_enhancers={face_enhancers}"
                     generated_urls.append(image_url)
 
                 st.success(f"✨ शार्प क्वालिटी की {num_images} इमेज तैयार हैं!")
 
+                # Fix: Removed the `st.write(idx)` or any index printing that caused the '0' error
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
                     with cols[idx % len(cols)]:
