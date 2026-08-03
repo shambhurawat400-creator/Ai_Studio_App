@@ -4,29 +4,33 @@ from datetime import datetime
 import time
 
 def render_image_page():
-    st.subheader("🎨 Pro Text-to-Image Studio (Patreon Quality)")
-    st.write("बेहतरीन टेक्सचर, शार्प डिटेल्स और शानदार क्वालिटी के साथ इमेज बनाएं (Free API Boosted):")
+    st.subheader("🎨 Free Pro Storybook Studio")
+    st.write("बिना किसी खर्च के शानदार क्वालिटी और साफ़ चेहरों वाली इमेज बनाएं:")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="A cinematic portrait of an old village woman stopping Rahul, dramatic lighting, masterpiece...")
-    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry, ugly, deformed hands, low quality, text")
+    # Prompt Box
+    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="An old grandmother crying, a sad man reading a letter, village room, detailed faces...")
+    
+    # Negative Prompt Box (ताकि ब्लर या खराब इमेज न आए)
+    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", value="blurry, distorted face, low quality, bad anatomy, dark shadows, ugly")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
-        "Cinematic Masterpiece", "Midjourney Style", "Ultra Realistic", 
-        "Anime (Studio Ghibli)", "Pixar Style 3D", 
-        "2D Illustration", "Fantasy Art", "Sci-Fi Concept", 
-        "Watercolor Painting", "Oil Painting"
+        "Indian Storybook Illustration (बेस्ट)",
+        "2D Animation / Cartoon",
+        "Cinematic Story Frame",
+        "Classic Oil Painting",
+        "Watercolor Art"
     ])
 
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        ratio_option = st.selectbox("📐 Aspect Ratio", ["Portrait (9:16) - Mobile", "Landscape (16:9) - Desktop", "Square (1:1)"])
+        ratio_option = st.selectbox("📐 Aspect Ratio", ["Landscape (16:9)", "Portrait (9:16)", "Square (1:1)"])
         if "16:9" in ratio_option:
             width, height = 1280, 720
         elif "9:16" in ratio_option:
@@ -35,53 +39,43 @@ def render_image_page():
             width, height = 1024, 1024
 
     with col2:
-        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (Best Texture)", "High Quality", "Standard"])
-        if "Ultra HD" in quality_mode:
-            width, height = int(width * 1.4), int(height * 1.4)
+        quality_mode = st.selectbox("⚡ Quality Mode", ["HD Quality", "Standard"])
+        if "HD" in quality_mode:
+            width, height = int(width * 1.2), int(height * 1.2)
 
     with col3:
         num_images = st.slider("🔢 Number of Images", 1, 4, 1)
 
-    if st.button("🚀 Generate Premium Quality Images", type="primary", use_container_width=True):
+    if st.button("🚀 Generate Free Images Now", type="primary", use_container_width=True):
         if img_prompt.strip():
-            with st.spinner(f"✨ {style_option} और एडवांस बूस्टर के साथ इमेज रेंडर हो रही है... कृपया प्रतीक्षा करें..."):
-                
-                # --- Progress Bar (0.7 seconds) ---
-                progress_bar = st.progress(0)
-                for percent_complete in range(100):
-                    time.sleep(0.007)
-                    progress_bar.progress(percent_complete + 1)
-                progress_bar.empty()
-                # --- End of Progress Bar ---
+            
+            # Loading Progress Bar
+            progress_text = "✨ AI फ्री मॉडल से बेहतरीन क्वालिटी तैयार कर रहा है..."
+            my_bar = st.progress(0, text=progress_text)
+            for percent_complete in range(100):
+                time.sleep(0.008)
+                my_bar.progress(percent_complete + 1, text=f"{progress_text} ({percent_complete + 1}%)")
+            time.sleep(0.2)
+            my_bar.empty()
 
-                # --- Master Enhancement Engine ---
-                # These tags are combined to force the free FLUX model to produce higher quality output.
-                mj_v6_tags = "--ar 9:16 --v 6.0 --style raw --niji 6" # Just a hint, not actual Midjourney code
-                master_tags = f"extremely detailed, 8k resolution, cinematic lighting, intricate textures, masterpiece, photorealistic, {mj_v6_tags}"
+            with st.spinner("🖼️ इमेज लोड हो रही है..."):
+                
+                # Quality boosters for free model
+                free_boost = "extremely detailed faces, sharp focus, clean lines, vibrant colors, masterpiece, 8k resolution"
                 
                 style_tags_map = {
-                    "Cinematic Masterpiece": f"cinematic film still, {master_tags}, dramatic shadows, color graded",
-                    "Midjourney Style": f"midjourney style, high contrast, richly detailed, {master_tags}, complex composition",
-                    "Ultra Realistic": f"hyper-realistic photograph, raw photo, 8k uhd, dslr, {master_tags}, sharp focus",
-                    "Anime (Studio Ghibli)": f"studio ghibli style, vibrant colors, detailed background, {master_tags}, anime art",
-                    "Pixar Style 3D": f"3d disney pixar style animation, cute, volumetric lighting, {master_tags}, expressive character",
-                    "2D Illustration": f"classic 2d vector illustration, clean lines, professional art, {master_tags}",
-                    "Fantasy Art": f"magical fantasy art, ethereal glow, intricate details, {master_tags}, epic atmosphere",
-                    "Sci-Fi Concept": f"futuristic sci-fi concept art, high-tech details, neon lights, {master_tags}",
-                    "Watercolor Painting": f"soft watercolor painting, artistic brushwork, textured paper, {master_tags}",
-                    "Oil Painting": f"classic oil painting, impasto texture, rich colors, {master_tags}, masterpiece on canvas"
+                    "Indian Storybook Illustration (बेस्ट)": f"classic Indian storybook vector illustration, beautifully drawn characters and room background, {free_boost}",
+                    "2D Animation / Cartoon": f"professional 2d animation cell, clean outlines, vibrant clear lighting, {free_boost}",
+                    "Cinematic Story Frame": f"cinematic story frame, warm ambient lighting, highly detailed background, {free_boost}",
+                    "Classic Oil Painting": f"classic oil painting on canvas, rich textured brushwork, masterpiece, {free_boost}",
+                    "Watercolor Art": f"soft watercolor painting style, artistic brush strokes, clear background, {free_boost}"
                 }
 
-                current_style_tag = style_tags_map.get(style_option, f"{master_tags}")
+                current_style_tag = style_tags_map.get(style_option, free_boost)
                 clean_input = img_prompt.strip()
                 final_prompt = f"{clean_input}, {current_style_tag}"
                 
-                # Aggressive negative tags to prevent blur and distortion
-                default_neg = "blurry, ugly, deformed hands, distorted face, low quality, bad anatomy, text, watermark, signature, out of focus"
-                if neg_prompt.strip():
-                    final_neg = f"{neg_prompt.strip()}, {default_neg}"
-                else:
-                    final_neg = default_neg
+                final_neg = neg_prompt.strip() if neg_prompt.strip() else "blurry, low quality"
 
                 encoded_prompt = urllib.parse.quote(final_prompt)
                 encoded_neg = urllib.parse.quote(final_neg)
@@ -89,11 +83,11 @@ def render_image_page():
                 generated_urls = []
                 for i in range(num_images):
                     seed_val = datetime.now().microsecond + i
-                    # Using 'flux' model with explicit quality parameters for better texture
-                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}&quality=95&upscale=true"
+                    # Using free flux model URL
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}"
                     generated_urls.append(image_url)
 
-                st.success(f"🎉 सफलतापूर्वक {num_images} प्रीमियम इमेज तैयार हो गई हैं!")
+                st.success(f"✨ शानदार क्वालिटी की {num_images} इमेज तैयार हैं!")
 
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
@@ -123,7 +117,7 @@ def render_image_page():
                 st.markdown(f"[🔗 Direct Link]({proj['url']})")
                 st.write("---")
         else:
-            st.info("कोई प्रोजेक्ट सेव नहीं है。")
+            st.info("कोई प्रोजेक्ट सेव नहीं है।")
 
     with tab2:
         st.subheader("पिछली जनरेट की गई इमेजेस (History)")
@@ -133,4 +127,4 @@ def render_image_page():
                 st.image(hist['url'], width=250)
                 st.write("---")
         else:
-            st.info("इतिहास (History) खाली है。")
+            st.info("इतिहास (History) खाली है।")
