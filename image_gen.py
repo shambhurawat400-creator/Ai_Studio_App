@@ -4,16 +4,16 @@ from datetime import datetime
 import time
 
 def render_image_page():
-    st.subheader("🎨 Pro Text-to-Image Studio with Smart VFX")
-    st.write("सुपर-फास्ट लोडिंग, ऑटोमैटिक VFX और शार्प क्वालिटी के साथ इमेज बनाएं:")
+    st.subheader("🎨 Pro Text-to-Image Studio with Face Booster")
+    st.write("चेहरे के परफेक्ट डिटेल्स, शानदार लाइटिंग और सुपर-फास्ट क्वालिटी के साथ इमेज बनाएं:")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="A magical forest with glowing lights, vibrant colors, cinematic VFX...")
-    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry, dark, dull colors, deformed")
+    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="Old village woman stopping Rahul, front face clearly visible, expressive eyes, detailed facial features...")
+    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="silhouette, dark face, hidden face, blurry eyes, low quality")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
@@ -34,70 +34,68 @@ def render_image_page():
             width, height = 1024, 1024
 
     with col2:
-        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (4K)", "HD Quality (1080p)", "Standard"])
+        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (4K Masterpiece)", "HD Quality (1080p)", "Standard"])
         if "Ultra HD" in quality_mode:
-            width, height = int(width * 1.25), int(height * 1.25)
+            width, height = int(width * 1.3), int(height * 1.3)
 
     with col3:
         num_images = st.slider("🔢 Number of Images", 1, 4, 1)
 
     if st.button("🚀 Generate Images Now", type="primary", use_container_width=True):
         if img_prompt.strip():
-            with st.spinner(f"🎨 {style_option} स्टाइल और स्मार्ट VFX के साथ इमेज रेंडर हो रही है..."):
+            with st.spinner(f"🎨 {style_option} स्टाइल और फेस बूस्टर के साथ इमेज रेंडर हो रही है..."):
                 
-                # --- Hyper-Fast Progress Bar Simulation (0.5 seconds) ---
+                # Progress Bar (0.5 seconds)
                 progress_bar = st.progress(0)
                 for percent_complete in range(100):
-                    time.sleep(0.005) # Fast speed: 100 steps * 0.005s = 0.5 seconds
+                    time.sleep(0.005)
                     progress_bar.progress(percent_complete + 1)
+                progress_bar.empty()
                 
-                progress_bar.empty() # Remove progress bar after completion
-                # --- End of Progress Bar ---
-
-                # --- Smart VFX & Clarity Enhancement ---
-                smart_vfx = "stunning visual effects, vibrant rich color grading, dramatic lighting, professional VFX, masterpiece"
-                clarity_boost = "extremely detailed, sharp focus, high definition, 8k resolution"
+                # --- Ultimate Face Clarity & Front Lighting Engine ---
+                face_and_vfx_boost = "face clearly visible from front, perfectly illuminated facial features, crystal clear sharp eyes, vibrant rich color grading, stunning visual effects, 8k resolution, masterpiece, highly detailed textures"
                 
                 style_tags_map = {
-                    "Cinematic": f"cinematic film still, {smart_vfx}, {clarity_boost}, depth of field",
-                    "Realistic": f"hyper-realistic, {smart_vfx}, {clarity_boost}, photorealistic, sharp focus",
-                    "Anime": f"high quality anime art, studio ghibli style, vibrant colors, {smart_vfx}",
-                    "Pixar": f"3d disney pixar style animation, cute, {smart_vfx}, vibrant lighting",
-                    "3D": f"octane render, 3d blender art, volumetric lighting, {smart_vfx}",
-                    "2D": f"classic 2d vector art, clean lines, professional illustration, {smart_vfx}",
-                    "Cartoon": f"fun cartoon style, bold outlines, bright expressive colors, {smart_vfx}",
-                    "Fantasy": f"magical fantasy art, ethereal glow, {smart_vfx}, mythical environment",
-                    "Sci-Fi": f"futuristic sci-fi concept art, cyberpunk neon lights, {smart_vfx}",
-                    "Watercolor": f"soft watercolor painting style, artistic brush strokes, {smart_vfx}",
-                    "Oil Painting": f"classic oil painting on canvas, rich textured brushwork, {smart_vfx}"
+                    "Cinematic": f"cinematic film portrait, front key lighting, {face_and_vfx_boost}, depth of field",
+                    "Realistic": f"hyper-realistic photography, sharp focus on face, {face_and_vfx_boost}, photorealistic",
+                    "Anime": f"high quality anime art, studio ghibli style, clear expressive face, {face_and_vfx_boost}",
+                    "Pixar": f"3d disney pixar style animation, bright facial lighting, expressive eyes, {face_and_vfx_boost}",
+                    "3D": f"octane render, 3d character art, perfect face illumination, {face_and_vfx_boost}",
+                    "2D": f"classic 2d vector art, clean sharp lines, clearly visible face and expression, {face_and_vfx_boost}",
+                    "Cartoon": f"fun cartoon style, bold outlines, bright expressive face, {face_and_vfx_boost}",
+                    "Fantasy": f"magical fantasy art, glowing facial highlights, clear detailed face, {face_and_vfx_boost}",
+                    "Sci-Fi": f"futuristic sci-fi art, neon facial illumination, clear details, {face_and_vfx_boost}",
+                    "Watercolor": f"soft watercolor painting style, clear facial features, {face_and_vfx_boost}",
+                    "Oil Painting": f"classic oil painting on canvas, clear illuminated face, {face_and_vfx_boost}"
                 }
 
-                current_style_tag = style_tags_map.get(style_option, f"masterpiece, {smart_vfx}, {clarity_boost}")
+                current_style_tag = style_tags_map.get(style_option, f"masterpiece, {face_and_vfx_boost}")
                 clean_input = img_prompt.strip()
                 final_prompt = f"{clean_input}, {current_style_tag}"
                 
-                default_neg = "blurry, dark, dull colors, deformed, bad anatomy, ugly"
+                # Strong negative prompt to completely ban dark silhouettes and hidden faces
+                default_neg = "silhouette, backlighting, dark face, shadow on face, hidden face, blurry eyes, closed eyes, deformed, low quality"
                 if neg_prompt.strip():
                     final_neg = f"{neg_prompt.strip()}, {default_neg}"
                 else:
                     final_neg = default_neg
 
                 encoded_prompt = urllib.parse.quote(final_prompt)
-                encoded_neg = urllib.parse.quote(final_neg)
+                encoded_neg = urllib.parse.quote(default_neg)
                 
                 generated_urls = []
                 for i in range(num_images):
                     seed_val = datetime.now().microsecond + i
-                    # Using 'flux' model for best quality and ensuring VFX is applied
+                    # Using flux model with enhanced parameters for maximum clarity
                     image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}"
                     generated_urls.append(image_url)
 
-                st.success(f"✨ शानदार VFX और {num_images} इमेज तैयार हैं!")
+                st.success(f"✨ साफ़ चेहरे और शानदार क्वालिटी की {num_images} इमेज तैयार हैं!")
 
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
                     with cols[idx % len(cols)]:
-                        st.image(url, caption=f"Style: {style_option} | #{idx+1}", use_column_width=True)
+                        st.image(url, caption=f"Style: {style_option} | Face Boosted | #{idx+1}", use_column_width=True)
                         st.markdown(f"[📥 Download Image {idx+1}]({url})")
                         
                         if st.button(f"💾 Save Project #{idx+1}", key=f"save_{seed_val}_{idx}"):
@@ -122,7 +120,7 @@ def render_image_page():
                 st.markdown(f"[🔗 Direct Link]({proj['url']})")
                 st.write("---")
         else:
-            st.info("कोई प्रोजेक्ट सेव नहीं है。")
+            st.info("कोई प्रोजेक्ट सेव नहीं है।")
 
     with tab2:
         st.subheader("पिछली जनरेट की गई इमेजेस (History)")
@@ -132,4 +130,4 @@ def render_image_page():
                 st.image(hist['url'], width=250)
                 st.write("---")
         else:
-            st.info("इतिहास (History) खाली है。")
+            st.info("इतिहास (History) खाली है।")
