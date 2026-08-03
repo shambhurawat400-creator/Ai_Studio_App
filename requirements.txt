@@ -4,3 +4,4 @@ gotrue
 groq
 streamlit-cookies-manager
 gTTS
+edge-tts
