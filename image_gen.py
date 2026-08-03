@@ -4,25 +4,25 @@ from datetime import datetime
 
 def render_image_page():
     st.subheader("🎨 Pro Text-to-Image Studio")
-    st.write("शार्प चेहरे, स्पष्ट आँखें और परफेक्ट बैकग्राउंड के साथ हाई-क्वालिटी इमेज बनाएं:")
+    st.write("आपके लिखे गए प्रॉम्प्ट के अनुसार सटीक और बेहतरीन क्वालिटी की इमेज बनाएं:")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="An Indian grandmother crying, a sad man reading a letter, and a young girl, highly detailed room, clear eyes, sharp focus...")
-    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry eyes, distorted face, out of focus background, dark shadows, low quality")
+    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="Mohan shining a powerful flashlight deep inside the ancient dry well while others watch...")
+    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry, distorted, low quality, bad anatomy")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
-        "Indian Storybook Illustration (बेस्ट क्वालिटी)",
-        "2D Cartoon / Animation",
-        "Cinematic", 
+        "Cinematic Horror / Animation",
+        "Indian Storybook Illustration",
         "Realistic", 
         "Anime", 
         "Pixar", 
         "3D", 
+        "2D", 
         "Cartoon", 
         "Fantasy", 
         "Sci-Fi", 
@@ -42,47 +42,40 @@ def render_image_page():
             width, height = 1024, 1024
 
     with col2:
-        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (High Detail)", "HD Quality (1080p)", "Standard"])
+        quality_mode = st.selectbox("⚡ Quality Mode", ["Ultra HD (4K)", "HD Quality (1080p)", "Standard"])
         if "Ultra HD" in quality_mode:
             width, height = int(width * 1.25), int(height * 1.25)
 
     with col3:
         num_images = st.slider("🔢 Number of Images", 1, 4, 1)
 
-    if st.button("🚀 Generate High Quality Images", type="primary", use_container_width=True):
+    if st.button("🚀 Generate Images Now", type="primary", use_container_width=True):
         if img_prompt.strip():
-            with st.spinner(f"🎨 {style_option} स्टाइल में क्रिस्टल-क्लियर इमेज तैयार हो रही है..."):
+            with st.spinner(f"🎨 आपके प्रॉम्प्ट के अनुसार इमेज रेंडर हो रही है..."):
                 
-                # Bulletproof tags for absolute clarity, sharp eyes and crystal clear background
-                ultimate_clarity = "extremely detailed sharp eyes, crystal clear facial features, fully focused sharp background, perfectly lit room, vibrant rich colors, masterwork illustration, 8k resolution"
-                face_enhancers = "codeformer, gfpgan, realistic_vision_inpainting_v4" # Adding face fixing techniques
-                
-                style_tags_map = {
-                    "Indian Storybook Illustration (बेस्ट क्वालिटी)": f"classic Indian storybook vector illustration, clean sharp outlines, warm soft lighting, beautifully drawn characters and clear indoor room background, {ultimate_clarity}",
-                    "2D Cartoon / Animation": f"professional 2d animation cell, clean outlines, vibrant clear lighting, {ultimate_clarity}",
-                    "Cinematic": f"cinematic story frame, balanced warm lighting, highly detailed background, {ultimate_clarity}",
-                    "Realistic": f"hyper-realistic painting, detailed textures, sharp lighting, {ultimate_clarity}",
-                    "Anime": f"high quality anime art, expressive clear eyes, beautiful sharp background, {ultimate_clarity}",
-                    "Pixar": f"3d disney pixar style animation, cute, vibrant lighting, sharp focus, {ultimate_clarity}",
-                    "3D": f"octane render, 3d art, sharp volumetric lighting, {ultimate_clarity}",
-                    "2D": f"classic 2d vector art, clean lines, professional illustration, {ultimate_clarity}",
-                    "Cartoon": f"fun cartoon style, bold outlines, bright expressive colors, sharp details",
-                    "Fantasy": f"magical fantasy art, ethereal glow, detailed sharp environment, {ultimate_clarity}",
-                    "Sci-Fi": f"futuristic sci-fi art, high-tech sharp details, {ultimate_clarity}",
-                    "Watercolor": f"soft watercolor painting style, artistic brush strokes, clear background, {ultimate_clarity}",
-                    "Oil Painting": f"classic oil painting on canvas, rich textured brushwork, masterpiece, {ultimate_clarity}"
+                # Minimal clean style suffix so AI focuses primarily on user prompt
+                style_suffix_map = {
+                    "Cinematic Horror / Animation": "cinematic horror animation style, highly detailed, 8k",
+                    "Indian Storybook Illustration": "indian storybook illustration style, detailed, 8k",
+                    "Realistic": "hyper-realistic, highly detailed, 8k resolution",
+                    "Anime": "high quality anime style, detailed art",
+                    "Pixar": "3d disney pixar animation style",
+                    "3D": "octane render, 3d blender art, highly detailed",
+                    "2D": "classic 2d vector art, clean lines",
+                    "Cartoon": "fun cartoon style, bold outlines",
+                    "Fantasy": "magical fantasy art style",
+                    "Sci-Fi": "futuristic sci-fi concept art",
+                    "Watercolor": "soft watercolor painting style",
+                    "Oil Painting": "classic oil painting on canvas"
                 }
 
-                current_style_tag = style_tags_map.get(style_option, ultimate_clarity)
-                clean_input = img_prompt.strip()
-                final_prompt = f"{clean_input}, {current_style_tag}"
+                chosen_suffix = style_suffix_map.get(style_option, "masterpiece, 8k")
                 
-                # Explicit negative prompt for face clarity
-                default_neg = "blurry eyes, closed eyes, out of focus background, dark shadows on face, low quality, bad anatomy, distorted features"
-                if neg_prompt.strip():
-                    final_neg = f"{neg_prompt.strip()}, {default_neg}"
-                else:
-                    final_neg = default_neg
+                # Directly using user prompt and adding chosen style smoothly
+                clean_input = img_prompt.strip()
+                final_prompt = f"{clean_input}, {chosen_suffix}"
+                
+                final_neg = neg_prompt.strip() if neg_prompt.strip() else "blurry, low quality, deformed, bad anatomy"
 
                 encoded_prompt = urllib.parse.quote(final_prompt)
                 encoded_neg = urllib.parse.quote(final_neg)
@@ -90,13 +83,12 @@ def render_image_page():
                 generated_urls = []
                 for i in range(num_images):
                     seed_val = datetime.now().microsecond + i
-                    # Switched to 'turbo' model for crisp, sharp rendering and added negative prompt parameter in URL
-                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=turbo&nologo=true&negative={encoded_neg}&face_enhancers={face_enhancers}"
+                    # Using flux model with exact user prompt mapping
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}"
                     generated_urls.append(image_url)
 
-                st.success(f"✨ शार्प क्वालिटी की {num_images} इमेज तैयार हैं!")
+                st.success(f"✨ सफलतापूर्वक {num_images} इमेज तैयार हो गई हैं!")
 
-                # Fix: Removed the `st.write(idx)` or any index printing that caused the '0' error
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
                     with cols[idx % len(cols)]:
