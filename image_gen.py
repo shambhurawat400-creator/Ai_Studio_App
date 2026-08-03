@@ -4,15 +4,15 @@ from datetime import datetime
 
 def render_image_page():
     st.subheader("🎨 Pro Storybook & Animation Studio")
-    st.write("कहानी वाली शानदार 2D इलस्ट्रेशन और बेहतरीन क्वालिटी की तस्वीरें मुफ्त में बनाएं:")
+    st.write("शार्प चेहरे, स्पष्ट आँखें और परफेक्ट बैकग्राउंड के साथ हाई-क्वालिटी इमेज बनाएं:")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
 
-    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="An old grandmother, a sad man reading a letter, and a young girl sitting on a bed in a village home, emotional scene...")
-    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry, 3d render, photorealistic, dark shadows, low quality")
+    img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="An old grandmother crying, a sad man reading a letter, and a young girl, highly detailed room, clear eyes, sharp focus...")
+    neg_prompt = st.text_area("🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):", placeholder="blurry eyes, distorted face, out of focus background, dark shadows, low quality")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
@@ -51,32 +51,32 @@ def render_image_page():
 
     if st.button("🚀 Generate High Quality Images", type="primary", use_container_width=True):
         if img_prompt.strip():
-            with st.spinner(f"🎨 {style_option} स्टाइल में शानदार क्वालिटी की इमेज तैयार हो रही है..."):
+            with st.spinner(f"🎨 {style_option} स्टाइल में क्रिस्टल-क्लियर इमेज तैयार हो रही है..."):
                 
-                # Special storytelling illustration tags to match the reference image quality
-                story_art_tags = "detailed storybook illustration, expressive clear faces, warm lighting, clearly visible indoor background, beautiful detailed room, masterpiece, 8k resolution"
+                # Bulletproof tags for absolute clarity, sharp eyes and crystal clear background
+                ultimate_clarity = "extremely detailed sharp eyes, crystal clear facial features, fully focused sharp background, perfectly lit room, vibrant rich colors, masterwork illustration, 8k resolution"
                 
                 style_tags_map = {
-                    "Indian Storybook Illustration (बेस्ट क्वालिटी)": f"classic Indian storybook vector illustration, detailed line art, warm soft lighting, beautifully drawn characters and room background, {story_art_tags}",
-                    "2D Cartoon / Animation": f"professional 2d animation cell, clean outlines, vibrant lighting, {story_art_tags}",
-                    "Cinematic": f"cinematic story frame, warm ambient lighting, highly detailed background, {story_art_tags}",
-                    "Realistic": f"hyper-realistic painting, detailed textures, warm lighting, {story_art_tags}",
-                    "Anime": f"high quality anime art, expressive eyes, beautiful background, {story_art_tags}",
-                    "Pixar": f"3d disney pixar style animation, cute, vibrant lighting, {story_art_tags}",
-                    "3D": f"octane render, 3d art, volumetric lighting, {story_art_tags}",
-                    "2D": f"classic 2d vector art, clean lines, professional illustration, {story_art_tags}",
-                    "Cartoon": f"fun cartoon style, bold outlines, bright expressive colors, {story_art_tags}",
-                    "Fantasy": f"magical fantasy art, ethereal glow, detailed environment, {story_art_tags}",
-                    "Sci-Fi": f"futuristic sci-fi art, high-tech details, {story_art_tags}",
-                    "Watercolor": f"soft watercolor painting style, artistic brush strokes, pastel paper texture, {story_art_tags}",
-                    "Oil Painting": f"classic oil painting on canvas, rich textured brushwork, masterpiece, {story_art_tags}"
+                    "Indian Storybook Illustration (बेस्ट क्वालिटी)": f"classic Indian storybook vector illustration, clean sharp outlines, warm soft lighting, beautifully drawn characters and clear indoor room background, {ultimate_clarity}",
+                    "2D Cartoon / Animation": f"professional 2d animation cell, clean outlines, vibrant clear lighting, {ultimate_clarity}",
+                    "Cinematic": f"cinematic story frame, balanced warm lighting, highly detailed background, {ultimate_clarity}",
+                    "Realistic": f"hyper-realistic painting, detailed textures, sharp lighting, {ultimate_clarity}",
+                    "Anime": f"high quality anime art, expressive clear eyes, beautiful sharp background, {ultimate_clarity}",
+                    "Pixar": f"3d disney pixar style animation, cute, vibrant lighting, sharp focus, {ultimate_clarity}",
+                    "3D": f"octane render, 3d art, sharp volumetric lighting, {ultimate_clarity}",
+                    "2D": f"classic 2d vector art, clean lines, professional illustration, {ultimate_clarity}",
+                    "Cartoon": f"fun cartoon style, bold outlines, bright expressive colors, sharp details",
+                    "Fantasy": f"magical fantasy art, ethereal glow, detailed sharp environment, {ultimate_clarity}",
+                    "Sci-Fi": f"futuristic sci-fi art, high-tech sharp details, {ultimate_clarity}",
+                    "Watercolor": f"soft watercolor painting style, artistic brush strokes, clear background, {ultimate_clarity}",
+                    "Oil Painting": f"classic oil painting on canvas, rich textured brushwork, masterpiece, {ultimate_clarity}"
                 }
 
-                current_style_tag = style_tags_map.get(style_option, story_art_tags)
+                current_style_tag = style_tags_map.get(style_option, ultimate_clarity)
                 clean_input = img_prompt.strip()
                 final_prompt = f"{clean_input}, {current_style_tag}"
                 
-                default_neg = "darkness, black image, hidden faces, blurry eyes, low quality, bad anatomy, 3d realistic photo"
+                default_neg = "blurry eyes, closed eyes, out of focus background, dark shadows on face, low quality, bad anatomy, distorted features"
                 if neg_prompt.strip():
                     final_neg = f"{neg_prompt.strip()}, {default_neg}"
                 else:
@@ -88,11 +88,11 @@ def render_image_page():
                 generated_urls = []
                 for i in range(num_images):
                     seed_val = datetime.now().microsecond + i
-                    # Using 'flux' model with explicit prompt adjustments for best free output
-                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=flux&nologo=true&negative={encoded_neg}"
+                    # Switched to 'turbo' model for crisp, sharp rendering and explicitly added negative prompt support in URL
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed_val}&model=turbo&nologo=true&negative={encoded_neg}"
                     generated_urls.append(image_url)
 
-                st.success(f"✨ बेहतरीन क्वालिटी की {num_images} इमेज तैयार हैं!")
+                st.success(f"✨ शार्प क्वालिटी की {num_images} इमेज तैयार हैं!")
 
                 cols = st.columns(min(num_images, 2))
                 for idx, url in enumerate(generated_urls):
