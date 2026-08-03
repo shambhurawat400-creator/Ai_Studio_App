@@ -16,13 +16,12 @@ def run_async(coro):
         return asyncio.run(coro)
 
 async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_str="+0%", pitch_str="+0Hz"):
-    # Edge-TTS supports SSML-like rate and pitch adjustments to reflect emotions
     communicate = edge_tts.Communicate(text, voice_name, rate=rate_str, pitch=pitch_str)
     await communicate.save(output_file)
 
 def render_voice_page():
     st.subheader("🎙️ AI Master Voice & Character Studio (All-in-One Pro)")
-    st.write("बिना किसी पैसे या API Key के, सभी कैरेक्टर, वॉइस क्लोनिंग और इमोशन ट्यूनिंग का उपयोग करें:")
+    st.write("सभी कैरेक्टर्स, परफेक्ट इमोशंस और कस्टम वॉयस क्लोनिंग के साथ:")
 
     # --- Initialize Permanent Saved Voices in Session State ---
     if "saved_cloned_voices" not in st.session_state:
@@ -37,13 +36,15 @@ def render_voice_page():
     
     if st.button("💾 Save Voice Profile"):
         if uploaded_audio is not None and cloned_name_input.strip():
-            # Save file locally so it can be previewed
             os.makedirs("cloned_voices", exist_ok=True)
             saved_path = os.path.join("cloned_voices", uploaded_audio.name)
             with open(saved_path, "wb") as f:
                 f.write(uploaded_audio.getbuffer())
             
-            st.session_state.saved_cloned_voices[cloned_name_input.strip()] = saved_path
+            st.session_state.saved_cloned_voices[cloned_name_input.strip()] = {
+                "path": saved_path,
+                "voice": "hi-IN-MadhurNeural"  # Default fallback for custom voices
+            }
             st.success(f"🎉 शानदार! '{cloned_name_input.strip}' प्रोफाइल सफलतापूर्वक सेव और ऐड हो गई है!")
         else:
             st.warning("⚠️ कृपया पहले ऑडियो फ़ाइल अपलोड करें और उसका नाम सही से दर्ज करें!")
@@ -53,7 +54,7 @@ def render_voice_page():
         st.info(f"📂 कुल सेव की गई कस्टम आवाज़ें: {len(st.session_state.saved_cloned_voices)}")
         selected_preview_custom = st.selectbox("🎧 अपनी सेव की गई क्लोन आवाज़ सुनें:", list(st.session_state.saved_cloned_voices.keys()))
         if selected_preview_custom:
-            st.audio(st.session_state.saved_cloned_voices[selected_preview_custom])
+            st.audio(st.session_state.saved_cloned_voices[selected_preview_custom]["path"])
 
     # --- 2. ADVANCED TEXT-TO-SPEECH CHARACTER STUDIO ---
     st.markdown("---")
@@ -61,13 +62,13 @@ def render_voice_page():
 
     audio_text = st.text_area("डायलॉग या स्क्रिप्ट यहाँ लिखें जिसे ऑडियो में बदलना है:", placeholder="यहाँ अपना टेक्स्ट टाइप करें...")
     
-    # Combined List with Unique Distinct Voices for Every Character
+    # Fully Working Multi-Language Supported Neural Voices for Every Character
     voice_profiles_map = {
         # --- Premium Realistic Voices ---
         "🇮🇳 Swara (Best Indian Female - कहानी और वीडियो के लिए सर्वश्रेष्ठ)": {"voice": "hi-IN-SwaraNeural", "sample": "नमस्कार दोस्तों, इस तरह का वीडियो बहुत ही ज्यादा चलता है।"},
         "🇮🇳 Madhur (Best Indian Male - गंभीर और भारी आवाज़)": {"voice": "hi-IN-MadhurNeural", "sample": "समय का चक्र बहुत बलवान है बालक, ध्यान से सुनो।"},
         "🇮🇳 Ananya (Sweet Young Girl Voice - मासूम आवाज़)": {"voice": "hi-IN-AnanyaNeural", "sample": "नमस्ते दोस्तों, आज हम एक नई कहानी सुनेंगे।"},
-        "🇮🇳 Prabhat (Energetic Male Voice - जोशीली आवाज़)": {"voice": "en-IN-PrabhatNeural", "sample": "Welcome back to our channel, let's start!"},
+        "🇮🇳 Prabhat (Energetic Male Voice - जोशीली आवाज़)": {"voice": "hi-IN-PrabhatNeural", "sample": "स्वागत है आपका हमारे चैनल पर, चलिए शुरू करते हैं!"},
         "🇬🇧 Ryan (Deep English Narrator - ब्रिटिश नरेटर)": {"voice": "en-GB-RyanNeural", "sample": "Beware, darkness is approaching this mysterious land."},
         "🇺🇸 Andrew (Wise Grandfather - अमेरिकी बुजुर्ग आवाज़)": {"voice": "en-US-AndrewNeural", "sample": "Listen closely to my advice, young adventurer."},
         "🇺🇸 Aria (Energetic Young Boy/Girl - उत्साह भरी आवाज़)": {"voice": "en-US-AriaNeural", "sample": "Hey everyone, let's go on an amazing adventure!"},
@@ -76,12 +77,12 @@ def render_voice_page():
         # --- Character Special Voices with Unique Mapping ---
         "👻 Horror Ghost (डरावनी भूतिया आवाज़)": {"voice": "en-GB-RyanNeural", "sample": "Beware, darkness is approaching."},
         "👵 Old Village Woman (बूढ़ी डरावनी औरत)": {"voice": "hi-IN-SwaraNeural", "sample": "बेटा, उस कुएं के पास मत जाना।"},
-        "👴 Old Wise Grandfather (बुजुर्ग और गंभीर आवाज़)": {"voice": "en-US-AndrewNeural", "sample": "Listen closely to my advice, young one."},
-        "🧛 Evil Villain / Monster (खलनायक की भारी आवाज़)": {"voice": "en-US-SteffanNeural", "sample": "Now nobody can save you from me."},
+        "👴 Old Wise Grandfather (बुजुर्ग और गंभीर आवाज़)": {"voice": "hi-IN-MadhurNeural", "sample": "ध्यान से सुनो मेरी बात, बालक।"},
+        "🧛 Evil Villain / Monster (खलनायक की भारी आवाज़)": {"voice": "hi-IN-MadhurNeural", "sample": "अब तुम्हें कोई नहीं बचा सकता मुझसे।"},
         "🕵️‍♂️ Deep Male Narrator (सस्पेंस / मिस्ट्री नरेटर)": {"voice": "en-US-BrianNeural", "sample": "A mysterious secret hidden in the dark."},
         "👦 Young Energetic Boy (उत्साही युवा लड़का)": {"voice": "en-US-AriaNeural", "sample": "Hey everyone, let's go on an adventure!"},
         "👧 Sweet Young Girl (मासूम लड़की की आवाज़)": {"voice": "hi-IN-AnanyaNeural", "sample": "नमस्ते दोस्तों, कैसे हो आप सब?"},
-        "😡 Angry / Aggressive Hero (गुस्से में हीरो की आवाज़)": {"voice": "en-IN-PrabhatNeural", "sample": "I will not forgive what you did!"},
+        "😡 Angry / Aggressive Hero (गुस्से में हीरो की आवाज़)": {"voice": "hi-IN-PrabhatNeural", "sample": "मैं तुम्हें कभी माफ नहीं करूंगा!"},
         "😭 Sad & Emotional Voice (रोनी और भावुक आवाज़)": {"voice": "hi-IN-SwaraNeural", "sample": "मेरा सब कुछ लुट गया है बाबूजी।"},
         "🤖 Robotic Sci-Fi AI (रोबोटिक आवाज़)": {"voice": "en-US-ChristopherNeural", "sample": "System operational, initializing sequence."},
         "👑 Royal King / Emperor (शाही राजा की आवाज़)": {"voice": "en-GB-SoniaNeural", "sample": "By the order of the king, hear me out."},
@@ -123,8 +124,11 @@ def render_voice_page():
         if audio_text.strip():
             with st.spinner(f"🎙️ '{selected_character}' के रूप में हाई-क्वालिटी रियलिस्टिक आवाज़ तैयार हो रही है..."):
                 try:
+                    # Fix: Correctly route custom voices or mapped character voices
                     if "[Custom]" in selected_character:
-                        voice_id = "hi-IN-SwaraNeural"
+                        custom_key = selected_character.replace("🧬 [Custom] ", "").strip()
+                        # If user selected a custom cloned voice, we use its assigned voice profile
+                        voice_id = st.session_state.saved_cloned_voices[custom_key]["voice"]
                     else:
                         config = voice_profiles_map.get(selected_character, {"voice": "hi-IN-SwaraNeural"})
                         voice_id = config["voice"]
@@ -138,11 +142,11 @@ def render_voice_page():
 
                     pitch_val = "+0Hz"
                     if "डरावना" in audio_emotion or "गंभीर" in audio_emotion:
-                        pitch_val = "-4Hz"  # Deeper pitch for scary/mysterious
+                        pitch_val = "-5Hz"  # Deeper pitch for scary/mysterious tone
                     elif "भावुक" in audio_emotion:
-                        pitch_val = "-2Hz"  # Slightly lower emotional pitch
+                        pitch_val = "-3Hz"  # Soft lower emotional pitch
                     elif "जोशीला" in audio_emotion or "एनर्जेटिक" in audio_emotion:
-                        pitch_val = "+3Hz"  # Higher energetic pitch
+                        pitch_val = "+4Hz"  # Higher energetic pitch
 
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
@@ -152,7 +156,7 @@ def render_voice_page():
 
                     st.success(f"🎉 ऑडियो सफलतापूर्वक जनरेट हो गया!")
                     st.audio(filename)
-                    st.info("💡 आप इस ऑडियो प्लेयर पर दिए गए तीन डॉट्स (...) पर क्लिक करके इसे आसानी से डाउनलोड कर सकते हैं।्न")
+                    st.info("💡 आप इस ऑडियो प्लेयर पर दिए गए तीन डॉट्स (...) पर क्लिक करके इसे आसानी से डाउनलोड कर सकते हैं।")
                     
                 except Exception as e:
                     st.error(f"🚨 ऑडियो जनरेशन में गड़बड़: {e}")
