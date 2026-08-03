@@ -3,3 +3,4 @@ supabase
 gotrue
 groq
 streamlit-cookies-manager
+gTTS
