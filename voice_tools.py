@@ -4,6 +4,18 @@ import asyncio
 import edge_tts
 from datetime import datetime
 
+# Safe Async Runner for Streamlit to prevent event loop crashes
+def run_async(coro):
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If a loop is already running, create a new task or use run_until_complete in a safe way
+            return asyncio.run(coro)
+        else:
+            return loop.run_until_complete(coro)
+    except RuntimeError:
+        return asyncio.run(coro)
+
 async def generate_edge_audio(text, voice_name, output_file):
     communicate = edge_tts.Communicate(text, voice_name)
     await communicate.save(output_file)
@@ -39,7 +51,7 @@ def render_voice_page():
 
     audio_text = st.text_area("डायलॉग या स्क्रिप्ट यहाँ लिखें जिसे ऑडियो में बदलना है:", placeholder="यहाँ अपना टेक्स्ट टाइप करें...")
     
-    # Combined List: All 12+ Character Voices + Ultra-Realistic Premium Neural Voices
+    # Combined List with Unique Distinct Voices for Every Character
     voice_profiles_map = {
         # --- Premium Realistic Voices ---
         "🇮🇳 Swara (Best Indian Female - कहानी और वीडियो के लिए सर्वश्रेष्ठ)": {"voice": "hi-IN-SwaraNeural", "sample": "नमस्कार दोस्तों, इस तरह का वीडियो बहुत ही ज्यादा चलता है।"},
@@ -51,7 +63,7 @@ def render_voice_page():
         "🇺🇸 Aria (Energetic Young Boy/Girl - उत्साह भरी आवाज़)": {"voice": "en-US-AriaNeural", "sample": "Hey everyone, let's go on an amazing adventure!"},
         "🇫🇷 French Mysterious Narrator (रहस्यमयी विदेशी आवाज़)": {"voice": "fr-FR-HenriNeural", "sample": "Un secret mystérieux caché dans la nuit sombre."},
         
-        # --- Character Special Voices ---
+        # --- Character Special Voices with Unique Mapping ---
         "👻 Horror Ghost (डरावनी भूतिया आवाज़)": {"voice": "en-GB-RyanNeural", "sample": "Beware, darkness is approaching."},
         "👵 Old Village Woman (बूढ़ी डरावनी औरत)": {"voice": "hi-IN-SwaraNeural", "sample": "बेटा, उस कुएं के पास मत जाना।"},
         "👴 Old Wise Grandfather (बुजुर्ग और गंभीर आवाज़)": {"voice": "en-US-AndrewNeural", "sample": "Listen closely to my advice, young one."},
@@ -79,7 +91,7 @@ def render_voice_page():
             preview_filename = f"preview_{config['voice']}.mp3"
             
             if not os.path.exists(preview_filename):
-                asyncio.run(generate_edge_audio(config["sample"], config["voice"], preview_filename))
+                run_async(generate_edge_audio(config["sample"], config["voice"], preview_filename))
             
             st.markdown(f"🔊 **चयनित कैरेक्टर का नैचुरल प्रीव्यू:**")
             st.audio(preview_filename)
@@ -109,8 +121,8 @@ def render_voice_page():
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
 
-                    # Generate using Edge-TTS
-                    asyncio.run(generate_edge_audio(audio_text, voice_id, filename))
+                    # Generate using Safe Async Runner
+                    run_async(generate_edge_audio(audio_text, voice_id, filename))
 
                     st.success(f"🎉 ऑडियो सफलतापूर्वक जनरेट हो गया!")
                     st.audio(filename)
