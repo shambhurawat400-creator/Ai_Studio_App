@@ -5,16 +5,20 @@ import edge_tts
 from datetime import datetime
 import io
 import re
-from pydub import AudioSegment, effects
 
-# --- 1. STUDIO AUDIO & BREATHING PROCESSOR ENGINE ---
+# --- Safe Studio Audio Enhancer (Pydub optional / safe fallback) ---
+try:
+    from pydub import AudioSegment, effects
+    PYDUB_AVAILABLE = True
+except ImportError:
+    PYDUB_AVAILABLE = False
+
 class StudioAudioEnhancer:
     """Applies smart pauses, human breathing tags, and audio mastering (DSP)."""
     
     @staticmethod
     def apply_smart_pauses_and_breathing(text: str, emotion: str) -> str:
         """Inserts natural breathing tokens and strategic sentence/punctuation pauses."""
-        # Add micro breathing for long texts
         sentences = text.split('.')
         processed_sentences = []
         
@@ -23,11 +27,9 @@ class StudioAudioEnhancer:
             if not sentence:
                 continue
                 
-            # Insert breathing tags for longer sentences
             if len(sentence.split()) > 8:
                 sentence = f"... {sentence}"
             
-            # Dynamic punctuation pauses
             sentence = sentence.replace(",", "... ")
             sentence = sentence.replace("!", "... ")
             sentence = sentence.replace("?", "...... ")
@@ -38,19 +40,18 @@ class StudioAudioEnhancer:
 
     @staticmethod
     def enhance_audio_bytes(audio_bytes: bytes, output_format: str = "mp3") -> bytes:
-        """Applies compression, normalization and warm studio sound effects."""
+        """Applies compression, normalization and warm studio sound effects if pydub is available."""
+        if not PYDUB_AVAILABLE:
+            return audio_bytes
         try:
             audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
-            # Dynamic Range Compression for warm voice
             audio = effects.compress_dynamic_range(audio, threshold=-18.0, ratio=2.0, attack=5.0, release=50.0)
-            # Peak Normalization
             audio = effects.normalize(audio, headroom=1.0)
             
             out_buffer = io.BytesIO()
             audio.export(out_buffer, format=output_format, bitrate="320k")
             return out_buffer.getvalue()
         except Exception:
-            # Fallback if pydub/ffmpeg environment lacks codecs
             return audio_bytes
 
 # Safe Async Runner for Streamlit to prevent event loop crashes
@@ -65,16 +66,13 @@ def run_async(coro):
         return asyncio.run(coro)
 
 async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_str="+0%", pitch_str="+0Hz"):
-    # Apply Smart Pauses & Breathing before sending to TTS engine
     enhanced_text = StudioAudioEnhancer.apply_smart_pauses_and_breathing(text, "normal")
     
     communicate = edge_tts.Communicate(enhanced_text, voice_name, rate=rate_str, pitch=pitch_str)
     
-    # Save raw audio first
     raw_output = output_file.replace(".mp3", "_raw.mp3")
     await communicate.save(raw_output)
     
-    # Post-process through Studio Enhancer DSP Chain
     if os.path.exists(raw_output):
         with open(raw_output, "rb") as f:
             raw_bytes = f.read()
@@ -107,7 +105,7 @@ def render_voice_page():
             
             str_lit.session_state.saved_cloned_voices[cloned_name_input.strip()] = {
                 "path": saved_path,
-                "voice": "hi-IN-MadhurNeural"  # Default fallback for custom voices
+                "voice": "hi-IN-MadhurNeural"
             }
             str_lit.success(f"🎉 शानदार! '{cloned_name_input.strip}' प्रोफाइल सफलतापूर्वक सेव और ऐड हो गई है!")
         else:
@@ -126,9 +124,7 @@ def render_voice_page():
 
     audio_text = str_lit.text_area("डायलॉग या स्क्रिप्ट यहाँ लिखें जिसे ऑडियो में बदलना है:", placeholder="यहाँ अपना टेक्स्ट टाइप करें...")
     
-    # Fully Working Multi-Language Supported Neural Voices for Every Character
     voice_profiles_map = {
-        # --- Premium Realistic Voices ---
         "🇮🇳 Swara (Best Indian Female - कहानी और वीडियो के लिए सर्वश्रेष्ठ)": {"voice": "hi-IN-SwaraNeural", "sample": "नमस्कार दोस्तों, इस तरह का वीडियो बहुत ही ज्यादा चलता है।"},
         "🇮🇳 Madhur (Best Indian Male - गंभीर और भारी आवाज़)": {"voice": "hi-IN-MadhurNeural", "sample": "समय का चक्र बहुत बलवान है बालक, ध्यान से सुनो।"},
         "🇮🇳 Ananya (Sweet Young Girl Voice - मासूम आवाज़)": {"voice": "hi-IN-AnanyaNeural", "sample": "नमस्ते दोस्तों, आज हम एक नई कहानी सुनेंगे।"},
@@ -137,8 +133,6 @@ def render_voice_page():
         "🇺🇸 Andrew (Wise Grandfather - अमेरिकी बुजुर्ग आवाज़)": {"voice": "en-US-AndrewNeural", "sample": "Listen closely to my advice, young adventurer."},
         "🇺🇸 Aria (Energetic Young Boy/Girl - उत्साह भरी आवाज़)": {"voice": "en-US-AriaNeural", "sample": "Hey everyone, let's go on an amazing adventure!"},
         "🇫🇷 French Mysterious Narrator (रहस्यमयी विदेशी आवाज़)": {"voice": "fr-FR-HenriNeural", "sample": "Un secret mystérieux caché dans la nuit sombre."},
-        
-        # --- Character Special Voices with Unique Mapping ---
         "👻 Horror Ghost (डरावनी भूतिया आवाज़)": {"voice": "en-GB-RyanNeural", "sample": "Beware, darkness is approaching."},
         "👵 Old Village Woman (बूढ़ी डरावनी औरत)": {"voice": "hi-IN-SwaraNeural", "sample": "बेटा, उस कुएं के पास मत जाना।"},
         "👴 Old Wise Grandfather (बुजुर्ग और गंभीर आवाज़)": {"voice": "hi-IN-MadhurNeural", "sample": "ध्यान से सुनो मेरी बात, बालक।"},
@@ -188,7 +182,6 @@ def render_voice_page():
         if audio_text.strip():
             with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में हाई-क्वालिटी रियलिस्टिक आवाज़ तैयार हो रही है..."):
                 try:
-                    # Fix: Correctly route custom voices or mapped character voices
                     if "[Custom]" in selected_character:
                         custom_key = selected_character.replace("🧬 [Custom] ", "").strip()
                         voice_id = str_lit.session_state.saved_cloned_voices[custom_key]["voice"]
@@ -196,7 +189,6 @@ def render_voice_page():
                         config = voice_profiles_map.get(selected_character, {"voice": "hi-IN-SwaraNeural"})
                         voice_id = config["voice"]
 
-                    # Map user emotion selection to actual Edge-TTS rate and pitch adjustments
                     rate_val = f"{int((speed_option - 1.0) * 100)}%"
                     if speed_option < 1.0:
                         rate_val = f"-{int((1.0 - speed_option) * 100)}%"
@@ -205,16 +197,15 @@ def render_voice_page():
 
                     pitch_val = "+0Hz"
                     if "डरावना" in audio_emotion or "गंभीर" in audio_emotion:
-                        pitch_val = "-5Hz"  # Deeper pitch for scary/mysterious tone
+                        pitch_val = "-5Hz"
                     elif "भावुक" in audio_emotion:
-                        pitch_val = "-3Hz"  # Soft lower emotional pitch
+                        pitch_val = "-3Hz"
                     elif "जोशीला" in audio_emotion or "एनर्जेटिक" in audio_emotion:
-                        pitch_val = "+4Hz"  # Higher energetic pitch
+                        pitch_val = "+4Hz"
 
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
 
-                    # Generate using Emotion, Smart Pauses & Studio Mastering
                     run_async(generate_edge_audio_with_emotion(audio_text, voice_id, filename, rate_str=rate_val, pitch_str=pitch_val))
 
                     str_lit.success(f"🎉 ऑडियो सफलतापूर्वक जनरेट हो गया!")
