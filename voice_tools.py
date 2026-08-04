@@ -1,8 +1,57 @@
-import streamlit as st
+import streamlit as str_lit
 import os
 import asyncio
 import edge_tts
 from datetime import datetime
+import io
+import re
+from pydub import AudioSegment, effects
+
+# --- 1. STUDIO AUDIO & BREATHING PROCESSOR ENGINE ---
+class StudioAudioEnhancer:
+    """Applies smart pauses, human breathing tags, and audio mastering (DSP)."""
+    
+    @staticmethod
+    def apply_smart_pauses_and_breathing(text: str, emotion: str) -> str:
+        """Inserts natural breathing tokens and strategic sentence/punctuation pauses."""
+        # Add micro breathing for long texts
+        sentences = text.split('.')
+        processed_sentences = []
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+                
+            # Insert breathing tags for longer sentences
+            if len(sentence.split()) > 8:
+                sentence = f"... {sentence}"
+            
+            # Dynamic punctuation pauses
+            sentence = sentence.replace(",", "... ")
+            sentence = sentence.replace("!", "... ")
+            sentence = sentence.replace("?", "...... ")
+            
+            processed_sentences.append(sentence)
+            
+        return " ... ".join(processed_sentences)
+
+    @staticmethod
+    def enhance_audio_bytes(audio_bytes: bytes, output_format: str = "mp3") -> bytes:
+        """Applies compression, normalization and warm studio sound effects."""
+        try:
+            audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
+            # Dynamic Range Compression for warm voice
+            audio = effects.compress_dynamic_range(audio, threshold=-18.0, ratio=2.0, attack=5.0, release=50.0)
+            # Peak Normalization
+            audio = effects.normalize(audio, headroom=1.0)
+            
+            out_buffer = io.BytesIO()
+            audio.export(out_buffer, format=output_format, bitrate="320k")
+            return out_buffer.getvalue()
+        except Exception:
+            # Fallback if pydub/ffmpeg environment lacks codecs
+            return audio_bytes
 
 # Safe Async Runner for Streamlit to prevent event loop crashes
 def run_async(coro):
@@ -16,51 +65,66 @@ def run_async(coro):
         return asyncio.run(coro)
 
 async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_str="+0%", pitch_str="+0Hz"):
-    communicate = edge_tts.Communicate(text, voice_name, rate=rate_str, pitch=pitch_str)
-    await communicate.save(output_file)
+    # Apply Smart Pauses & Breathing before sending to TTS engine
+    enhanced_text = StudioAudioEnhancer.apply_smart_pauses_and_breathing(text, "normal")
+    
+    communicate = edge_tts.Communicate(enhanced_text, voice_name, rate=rate_str, pitch=pitch_str)
+    
+    # Save raw audio first
+    raw_output = output_file.replace(".mp3", "_raw.mp3")
+    await communicate.save(raw_output)
+    
+    # Post-process through Studio Enhancer DSP Chain
+    if os.path.exists(raw_output):
+        with open(raw_output, "rb") as f:
+            raw_bytes = f.read()
+        mastered_bytes = StudioAudioEnhancer.enhance_audio_bytes(raw_bytes)
+        with open(output_file, "wb") as f:
+            f.write(mastered_bytes)
+        os.remove(raw_output)
 
 def render_voice_page():
-    st.subheader("🎙️ AI Master Voice & Character Studio (All-in-One Pro)")
-    st.write("सभी कैरेक्टर्स, परफेक्ट इमोशंस और कस्टम वॉयस क्लोनिंग के साथ:")
+    str_lit.subheader("🎙️ AI Master Voice & Character Studio (All-in-One Pro)")
+    str_lit.write("सभी कैरेक्टर्स, परफेक्ट इमोशंस, स्मार्ट पॉज़ और स्टूडियो मास्टरिंग के साथ:")
 
     # --- Initialize Permanent Saved Voices in Session State ---
-    if "saved_cloned_voices" not in st.session_state:
-        st.session_state.saved_cloned_voices = {}
+    if "saved_cloned_voices" not in str_lit.session_state:
+        str_lit.session_state.saved_cloned_voices = {}
 
     # --- 1. VOICE CLONING SECTION ---
-    st.markdown("---")
-    st.markdown("### 🧬 AI Voice Customization (स्थायी रूप से आवाज़ सेव करें)")
+    str_lit.markdown("---")
+    str_lit.markdown("### 🧬 AI Voice Customization (स्थायी रूप से आवाज़ सेव करें)")
     
-    uploaded_audio = st.file_uploader("अपनी आवाज़ का सैंपल अपलोड करें (WAV / MP3 / AAC):", type=["wav", "mp3", "m4a", "aac"])
-    cloned_name_input = st.text_input("📝 इस आवाज़ प्रोफाइल का नाम दें:", placeholder="जैसे: मेरी आवाज़, राहुल...")
+    uploaded_audio = str_lit.file_uploader("अपनी आवाज़ का सैंपल अपलोड करें (WAV / MP3 / AAC):", type=["wav", "mp3", "m4a", "aac"])
+    cloned_name_input = str_lit.text_input("📝 इस आवाज़ प्रोफाइल का नाम दें:", placeholder="जैसे: मेरी आवाज़, राहुल...")
     
-    if st.button("💾 Save Voice Profile"):
+    if str_lit.button("💾 Save Voice Profile"):
         if uploaded_audio is not None and cloned_name_input.strip():
             os.makedirs("cloned_voices", exist_ok=True)
             saved_path = os.path.join("cloned_voices", uploaded_audio.name)
             with open(saved_path, "wb") as f:
                 f.write(uploaded_audio.getbuffer())
             
-            st.session_state.saved_cloned_voices[cloned_name_input.strip()] = {
+            str_lit.session_state.saved_cloned_voices[cloned_name_input.strip()] = {
                 "path": saved_path,
                 "voice": "hi-IN-MadhurNeural"  # Default fallback for custom voices
             }
-            st.success(f"🎉 शानदार! '{cloned_name_input.strip}' प्रोफाइल सफलतापूर्वक सेव और ऐड हो गई है!")
+            str_lit.success(f"🎉 शानदार! '{cloned_name_input.strip}' प्रोफाइल सफलतापूर्वक सेव और ऐड हो गई है!")
         else:
-            st.warning("⚠️ कृपया पहले ऑडियो फ़ाइल अपलोड करें और उसका नाम सही से दर्ज करें!")
+            str_lit.warning("⚠️ कृपया पहले ऑडियो फ़ाइल अपलोड करें और उसका नाम सही से दर्ज करें!")
 
     # Display preview for uploaded/saved custom voices
-    if st.session_state.saved_cloned_voices:
-        st.info(f"📂 कुल सेव की गई कस्टम आवाज़ें: {len(st.session_state.saved_cloned_voices)}")
-        selected_preview_custom = st.selectbox("🎧 अपनी सेव की गई क्लोन आवाज़ सुनें:", list(st.session_state.saved_cloned_voices.keys()))
+    if str_lit.session_state.saved_cloned_voices:
+        str_lit.info(f"📂 कुल सेव की गई कस्टम आवाज़ें: {len(str_lit.session_state.saved_cloned_voices)}")
+        selected_preview_custom = str_lit.selectbox("🎧 अपनी सेव की गई क्लोन आवाज़ सुनें:", list(str_lit.session_state.saved_cloned_voices.keys()))
         if selected_preview_custom:
-            st.audio(st.session_state.saved_cloned_voices[selected_preview_custom]["path"])
+            str_lit.audio(str_lit.session_state.saved_cloned_voices[selected_preview_custom]["path"])
 
     # --- 2. ADVANCED TEXT-TO-SPEECH CHARACTER STUDIO ---
-    st.markdown("---")
-    st.markdown("### 🗣️ Ultimate Character & Realistic Voice Studio")
+    str_lit.markdown("---")
+    str_lit.markdown("### 🗣️ Ultimate Character & Realistic Voice Studio")
 
-    audio_text = st.text_area("डायलॉग या स्क्रिप्ट यहाँ लिखें जिसे ऑडियो में बदलना है:", placeholder="यहाँ अपना टेक्स्ट टाइप करें...")
+    audio_text = str_lit.text_area("डायलॉग या स्क्रिप्ट यहाँ लिखें जिसे ऑडियो में बदलना है:", placeholder="यहाँ अपना टेक्स्ट टाइप करें...")
     
     # Fully Working Multi-Language Supported Neural Voices for Every Character
     voice_profiles_map = {
@@ -90,10 +154,10 @@ def render_voice_page():
     }
 
     voice_profiles = list(voice_profiles_map.keys())
-    for custom_voice in list(st.session_state.saved_cloned_voices.keys()):
+    for custom_voice in list(str_lit.session_state.saved_cloned_voices.keys()):
         voice_profiles.insert(0, f"🧬 [Custom] {custom_voice}")
 
-    selected_character = st.selectbox("🎭 कैरेक्टर और रियलिस्टिक आवाज़ का चयन:", voice_profiles)
+    selected_character = str_lit.selectbox("🎭 कैरेक्टर और रियलिस्टिक आवाज़ का चयन:", voice_profiles)
 
     # --- INSTANT AUTO PREVIEW PLAYER ---
     if "[Custom]" not in selected_character:
@@ -104,31 +168,30 @@ def render_voice_page():
             if not os.path.exists(preview_filename):
                 run_async(generate_edge_audio_with_emotion(config["sample"], config["voice"], preview_filename))
             
-            st.markdown(f"🔊 **चयनित कैरेक्टर का नैचुरल प्रीव्यू:**")
-            st.audio(preview_filename)
+            str_lit.markdown(f"🔊 **चयनित कैरेक्टर का नैचुरल प्रीव्यू:**")
+            str_lit.audio(preview_filename)
         except Exception:
             pass
 
     # --- EMOTION SELECTION CONTROLS ---
-    audio_emotion = st.selectbox("⚡ भाव / टोन (Tone & Expression):", [
+    audio_emotion = str_lit.selectbox("⚡ भाव / टोन (Tone & Expression):", [
         "Normal / Clear & Natural (सामान्य और साफ़)",
         "Storytelling / Emotional (कहानी वाला भावुक अंदाज़)",
         "Excited / Energetic (जोशीला और एनर्जेटिक)",
         "Dark / Mysterious (गंभीर और डरावना)"
     ])
 
-    speed_option = st.slider("🗣️ बोलने की गति (Speed Mode):", 0.5, 2.0, 1.0, 0.1)
+    speed_option = str_lit.slider("🗣️ बोलने की गति (Speed Mode):", 0.5, 2.0, 1.0, 0.1)
 
     # --- GENERATE FULL AUDIO BUTTON ---
-    if st.button("Generate Master Character Audio 🔊✨", type="primary", use_container_width=True):
+    if str_lit.button("Generate Master Character Audio 🔊✨", type="primary", use_container_width=True):
         if audio_text.strip():
-            with st.spinner(f"🎙️ '{selected_character}' के रूप में हाई-क्वालिटी रियलिस्टिक आवाज़ तैयार हो रही है..."):
+            with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में हाई-क्वालिटी रियलिस्टिक आवाज़ तैयार हो रही है..."):
                 try:
                     # Fix: Correctly route custom voices or mapped character voices
                     if "[Custom]" in selected_character:
                         custom_key = selected_character.replace("🧬 [Custom] ", "").strip()
-                        # If user selected a custom cloned voice, we use its assigned voice profile
-                        voice_id = st.session_state.saved_cloned_voices[custom_key]["voice"]
+                        voice_id = str_lit.session_state.saved_cloned_voices[custom_key]["voice"]
                     else:
                         config = voice_profiles_map.get(selected_character, {"voice": "hi-IN-SwaraNeural"})
                         voice_id = config["voice"]
@@ -151,14 +214,14 @@ def render_voice_page():
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
 
-                    # Generate using Emotion & Speed parameters
+                    # Generate using Emotion, Smart Pauses & Studio Mastering
                     run_async(generate_edge_audio_with_emotion(audio_text, voice_id, filename, rate_str=rate_val, pitch_str=pitch_val))
 
-                    st.success(f"🎉 ऑडियो सफलतापूर्वक जनरेट हो गया!")
-                    st.audio(filename)
-                    st.info("💡 आप इस ऑडियो प्लेयर पर दिए गए तीन डॉट्स (...) पर क्लिक करके इसे आसानी से डाउनलोड कर सकते हैं।")
+                    str_lit.success(f"🎉 ऑडियो सफलतापूर्वक जनरेट हो गया!")
+                    str_lit.audio(filename)
+                    str_lit.info("💡 आप इस ऑडियो प्लेयर पर दिए गए तीन डॉट्स (...) पर क्लिक करके इसे आसानी से डाउनलोड कर सकते हैं।")
                     
                 except Exception as e:
-                    st.error(f"🚨 ऑडियो जनरेशन में गड़बड़: {e}")
+                    str_lit.error(f"🚨 ऑडियो जनरेशन में गड़बड़: {e}")
         else:
-            st.warning("⚠️ कृपया पहले टेक्स्ट बॉक्स में अपनी स्क्रिप्ट या डायलॉग लिखें!")
+            str_lit.warning("⚠️ कृपया पहले टेक्स्ट बॉक्स में अपनी स्क्रिप्ट या डायलॉग लिखें!")
