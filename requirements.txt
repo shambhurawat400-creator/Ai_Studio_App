@@ -5,3 +5,4 @@ groq
 streamlit-cookies-manager
 gTTS
 edge-tts
+pydub
