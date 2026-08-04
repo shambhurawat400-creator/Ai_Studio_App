@@ -18,7 +18,7 @@ class StudioAudioEnhancer:
     
     @staticmethod
     def apply_smart_pauses_and_breathing(text: str, emotion: str) -> str:
-        """Inserts natural breathing tokens and strategic sentence/punctuation pauses."""
+        """Inserts natural breathing tokens and strategic sentence/punctuation pauses based on emotion."""
         sentences = text.split('.')
         processed_sentences = []
         
@@ -30,9 +30,18 @@ class StudioAudioEnhancer:
             if len(sentence.split()) > 8:
                 sentence = f"... {sentence}"
             
-            sentence = sentence.replace(",", "... ")
-            sentence = sentence.replace("!", "... ")
-            sentence = sentence.replace("?", "...... ")
+            # Emotion-based distinct pacing and human touch
+            if "डरावना" in emotion or "गंभीर" in emotion:
+                sentence = sentence.replace(",", "...... ")
+                sentence = sentence.replace("!", "...... ")
+                sentence = sentence.replace("?", "......... ")
+            elif "भावुक" in emotion:
+                sentence = sentence.replace(",", ".... ")
+                sentence = sentence.replace("!", ".... ")
+            else:
+                sentence = sentence.replace(",", "... ")
+                sentence = sentence.replace("!", "... ")
+                sentence = sentence.replace("?", "...... ")
             
             processed_sentences.append(sentence)
             
@@ -45,8 +54,8 @@ class StudioAudioEnhancer:
             return audio_bytes
         try:
             audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
-            audio = effects.compress_dynamic_range(audio, threshold=-18.0, ratio=2.0, attack=5.0, release=50.0)
-            audio = effects.normalize(audio, headroom=1.0)
+            audio = effects.compress_dynamic_range(audio, threshold=-16.0, ratio=2.5, attack=4.0, release=40.0)
+            audio = effects.normalize(audio, headroom=0.5)
             
             out_buffer = io.BytesIO()
             audio.export(out_buffer, format=output_format, bitrate="320k")
@@ -65,8 +74,8 @@ def run_async(coro):
     except RuntimeError:
         return asyncio.run(coro)
 
-async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_str="+0%", pitch_str="+0Hz"):
-    enhanced_text = StudioAudioEnhancer.apply_smart_pauses_and_breathing(text, "normal")
+async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_str="+0%", pitch_str="+0Hz", emotion="Normal"):
+    enhanced_text = StudioAudioEnhancer.apply_smart_pauses_and_breathing(text, emotion)
     
     communicate = edge_tts.Communicate(enhanced_text, voice_name, rate=rate_str, pitch=pitch_str)
     
@@ -96,6 +105,14 @@ def render_voice_page():
     uploaded_audio = str_lit.file_uploader("अपनी आवाज़ का सैंपल अपलोड करें (WAV / MP3 / AAC):", type=["wav", "mp3", "m4a", "aac"])
     cloned_name_input = str_lit.text_input("📝 इस आवाज़ प्रोफाइल का नाम दें:", placeholder="जैसे: मेरी आवाज़, राहुल...")
     
+    # Base voice style for the custom clone mapping
+    clone_base_style = str_lit.selectbox("🎭 इस क्लोन के लिए आधार आवाज़ चुनें:", [
+        "🇮🇳 Madhur (Deep Male Voice)", 
+        "🇮🇳 Swara (Natural Female Voice)", 
+        "🇮🇳 Prabhat (Energetic Male Voice)", 
+        "🇮🇳 Ananya (Sweet Young Voice)"
+    ])
+
     if str_lit.button("💾 Save Voice Profile"):
         if uploaded_audio is not None and cloned_name_input.strip():
             os.makedirs("cloned_voices", exist_ok=True)
@@ -103,11 +120,19 @@ def render_voice_page():
             with open(saved_path, "wb") as f:
                 f.write(uploaded_audio.getbuffer())
             
+            mapped_voice = "hi-IN-MadhurNeural"
+            if "Swara" in clone_base_style:
+                mapped_voice = "hi-IN-SwaraNeural"
+            elif "Prabhat" in clone_base_style:
+                mapped_voice = "hi-IN-PrabhatNeural"
+            elif "Ananya" in clone_base_style:
+                mapped_voice = "hi-IN-AnanyaNeural"
+
             str_lit.session_state.saved_cloned_voices[cloned_name_input.strip()] = {
                 "path": saved_path,
-                "voice": "hi-IN-MadhurNeural"
+                "voice": mapped_voice
             }
-            str_lit.success(f"🎉 शानदार! '{cloned_name_input.strip}' प्रोफाइल सफलतापूर्वक सेव और ऐड हो गई है!")
+            str_lit.success(f"🎉 शानदार! '{cloned_name_input.strip}' प्रोफाइल सफलतापूर्वक सेव और टेक्स्ट-टू-स्पीच के लिए तैयार हो गई है!")
         else:
             str_lit.warning("⚠️ कृपया पहले ऑडियो फ़ाइल अपलोड करें और उसका नाम सही से दर्ज करें!")
 
@@ -124,6 +149,7 @@ def render_voice_page():
 
     audio_text = str_lit.text_area("डायलॉग या स्क्रिप्ट यहाँ लिखें जिसे ऑडियो में बदलना है:", placeholder="यहाँ अपना टेक्स्ट टाइप करें...")
     
+    # Fully Working Multi-Language Supported Neural Voices for Every Character (Fixed Ananya & Prabhat)
     voice_profiles_map = {
         "🇮🇳 Swara (Best Indian Female - कहानी और वीडियो के लिए सर्वश्रेष्ठ)": {"voice": "hi-IN-SwaraNeural", "sample": "नमस्कार दोस्तों, इस तरह का वीडियो बहुत ही ज्यादा चलता है।"},
         "🇮🇳 Madhur (Best Indian Male - गंभीर और भारी आवाज़)": {"voice": "hi-IN-MadhurNeural", "sample": "समय का चक्र बहुत बलवान है बालक, ध्यान से सुनो।"},
@@ -160,7 +186,7 @@ def render_voice_page():
             preview_filename = f"preview_{config['voice']}.mp3"
             
             if not os.path.exists(preview_filename):
-                run_async(generate_edge_audio_with_emotion(config["sample"], config["voice"], preview_filename))
+                run_async(generate_edge_audio_with_emotion(config["sample"], config["voice"], preview_filename, emotion="Normal"))
             
             str_lit.markdown(f"🔊 **चयनित कैरेक्टर का नैचुरल प्रीव्यू:**")
             str_lit.audio(preview_filename)
@@ -182,6 +208,7 @@ def render_voice_page():
         if audio_text.strip():
             with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में हाई-क्वालिटी रियलिस्टिक आवाज़ तैयार हो रही है..."):
                 try:
+                    # Fix: Properly route custom cloned voices and character configurations
                     if "[Custom]" in selected_character:
                         custom_key = selected_character.replace("🧬 [Custom] ", "").strip()
                         voice_id = str_lit.session_state.saved_cloned_voices[custom_key]["voice"]
@@ -195,18 +222,22 @@ def render_voice_page():
                     else:
                         rate_val = f"+{int((speed_option - 1.0) * 100)}%"
 
+                    # Distinct emotional pitch and pacing control
                     pitch_val = "+0Hz"
                     if "डरावना" in audio_emotion or "गंभीर" in audio_emotion:
-                        pitch_val = "-5Hz"
+                        pitch_val = "-6Hz"
+                        rate_val = "-10%"
                     elif "भावुक" in audio_emotion:
                         pitch_val = "-3Hz"
+                        rate_val = "-5%"
                     elif "जोशीला" in audio_emotion or "एनर्जेटिक" in audio_emotion:
-                        pitch_val = "+4Hz"
+                        pitch_val = "+5Hz"
+                        rate_val = "+10%"
 
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
 
-                    run_async(generate_edge_audio_with_emotion(audio_text, voice_id, filename, rate_str=rate_val, pitch_str=pitch_val))
+                    run_async(generate_edge_audio_with_emotion(audio_text, voice_id, filename, rate_str=rate_val, pitch_str=pitch_val, emotion=audio_emotion))
 
                     str_lit.success(f"🎉 ऑडियो सफलतापूर्वक जनरेट हो गया!")
                     str_lit.audio(filename)
