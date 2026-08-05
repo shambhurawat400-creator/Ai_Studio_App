@@ -120,7 +120,7 @@ def render_voice_page():
             with open(saved_path, "wb") as f:
                 f.write(uploaded_audio.getbuffer())
             
-            # Map exact neural voice based on selection
+            # Map exact neural voice ID based on user selection
             mapped_voice = "hi-IN-MadhurNeural"
             if "Swara" in clone_base_style:
                 mapped_voice = "hi-IN-SwaraNeural"
@@ -129,7 +129,7 @@ def render_voice_page():
             elif "Ananya" in clone_base_style:
                 mapped_voice = "hi-IN-SwaraNeural"
 
-            # Save permanently in session state session dictionary
+            # Save in session state dictionary permanently
             str_lit.session_state.saved_cloned_voices[cloned_name_input.strip()] = {
                 "path": saved_path,
                 "voice": mapped_voice
@@ -229,7 +229,7 @@ def render_voice_page():
                     pitch_val = "+0Hz"
                     if "डरावना" in audio_emotion or "गंभीर" in audio_emotion:
                         pitch_val = "-6Hz"
-                        rate_val = "-10%"
+                        rate_val = "-10% "
                     elif "भावुक" in audio_emotion:
                         pitch_val = "-3Hz"
                         rate_val = "-5%"
