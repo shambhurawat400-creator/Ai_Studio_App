@@ -11,3 +11,5 @@ edge-tts>=6.1.9
 pydub==0.25.1
 fastapi<0.110.0
 starlette<0.37.0
+gtts>=2.3.0
+pyttsx3==2.90
