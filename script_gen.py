@@ -1,8 +1,20 @@
 import streamlit as st
+from groq import Groq
 
 def render_script_page(groq_client):
     st.subheader("📜 AI Video & Story Script Writer (Pro Cinematic Level)")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए एक दम प्रोफेशनल और सिनेमैटिक स्क्रिप्ट तैयार कर सकते हैं:")
+
+    # साइडबार या ऊपर ही API Key सेट करने का आसान विकल्प ताकि 401 एरर न आए
+    api_key_input = st.text_input("अपनी Groq API Key दर्ज करें (यदि सेट नहीं है):", type="password", placeholder="gsk_...")
+    
+    # अगर यूजर ने यहाँ की दी है, तो नया क्लाइंट बना लेंगे, अन्यथा पास किए गए क्लाइंट का इस्तेमाल करेंगे
+    active_client = groq_client
+    if api_key_input.strip():
+        try:
+            active_client = Groq(api_key=api_key_input.strip())
+        except Exception:
+            pass
 
     topic = st.text_input("स्क्रिप्ट का टॉपिक/विषय दर्ज करें:", placeholder="जैसे: Horror story near a haunted well in an ancient village")
     
@@ -29,7 +41,11 @@ def render_script_page(groq_client):
     ])
 
     if st.button("Generate Pro Cinematic Script ✍️🎬", type="primary", use_container_width=True):
-        if topic.strip():
+        if not topic.strip():
+            st.warning("कृपया पहले टॉपिक दर्ज करें!")
+        elif not active_client:
+            st.error("🚨 कृपया ऊपर दिए गए बॉक्स में अपनी वैध Groq API Key दर्ज करें!")
+        else:
             with st.spinner("प्रो AI डायरेक्टर स्क्रिप्ट, विजुअल क्यूज और डायलॉग तैयार कर रहा है..."):
                 try:
                     full_script = ""
@@ -60,7 +76,7 @@ def render_script_page(groq_client):
                             prompt = f"""You are a World-Class Scriptwriter. Write a detailed, professional {script_type} with a '{tone_style}' tone on the topic: '{topic}'.
                             Include powerful hooks, scene descriptions, visual cues [Camera Angles, SFX], and emotional dialogues. Write in rich Hindi/Hinglish."""
 
-                        response = groq_client.chat.completions.create(
+                        response = active_client.chat.completions.create(
                             model="llama-3.1-8b-instant", 
                             messages=[{"role": "user", "content": prompt}],
                             max_tokens=4000
@@ -82,5 +98,3 @@ def render_script_page(groq_client):
 
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
-        else:
-            st.warning("कृपया पहले टॉपिक दर्ज करें!")
