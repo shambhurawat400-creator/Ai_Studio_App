@@ -2,8 +2,6 @@ import streamlit as str_lit
 import os
 import asyncio
 import edge_tts
-from gtts import gTTS
-import pyttsx3
 from datetime import datetime
 import io
 import re
@@ -20,11 +18,11 @@ class StudioAudioEnhancer:
     
     @staticmethod
     def apply_smart_pauses_and_breathing(text: str, emotion: str) -> str:
-        # Human touch tags simulation for Bark/Advanced engines
+        # फुसफुसाहट और एक्सप्रेशन के लिए नेचुरल टेक्स्ट फॉर्मेटिंग
         if "फुसफुसाहट" in emotion or "Whisper" in emotion:
-            text = f"[whispering] {text} [/whispering]"
+            text = f"shh... {text}... धीरे से सुनो..."
         elif "हंसते हुए" in emotion or "Laugh" in emotion:
-            text = f"[laughs] {text}"
+            text = f"हा हा... {text}..."
             
         sentences = re.split(r'(?<=[.!?])\s+', text)
         processed_sentences = []
@@ -39,16 +37,20 @@ class StudioAudioEnhancer:
             
             if "डरावना" in emotion or "गंभीर" in emotion:
                 sentence = sentence.replace(",", "...... ")
-                sentence.replace("!", "...... ")
-                sentence.replace("?", "......... ")
+                sentence = sentence.replace("!", "...... ")
+                sentence = sentence.replace("?", "......... ")
             elif "भावुक" in emotion:
-                sentence.replace(",", ".... ")
-                sentence.replace("!", ".... ")
-                sentence.replace("?", "...... ")
+                sentence = sentence.replace(",", ".... ")
+                sentence = sentence.replace("!", ".... ")
+                sentence = sentence.replace("?", "...... ")
+            elif "फुसफुसाहट" in emotion or "Whisper" in emotion:
+                sentence = sentence.replace(",", "... ")
+                sentence = sentence.replace("!", "... ")
+                sentence = sentence.replace("?", "... ")
             else:
-                sentence.replace(",", "... ")
-                sentence.replace("!", "... ")
-                sentence.replace("?", "...... ")
+                sentence = sentence.replace(",", "... ")
+                sentence = sentence.replace("!", "... ")
+                sentence = sentence.replace("?", "...... ")
             
             processed_sentences.append(sentence)
             
@@ -79,38 +81,10 @@ def run_async(coro):
     except RuntimeError:
         return asyncio.run(coro)
 
-async def generate_multi_engine_audio(text, engine_type, output_file, rate_str="+0%", pitch_str="+0Hz", emotion="Normal"):
+async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_str="+0%", pitch_str="+0Hz", emotion="Normal"):
     enhanced_text = StudioAudioEnhancer.apply_smart_pauses_and_breathing(text, emotion)
     
-    # 1. Google gTTS Engine
-    if engine_type == "gTTS-Engine":
-        lang_code = "hi" if "Hindi" in output_file or "hi" in output_file else "en"
-        tts = gTTS(text=enhanced_text, lang=lang_code, slow=False)
-        tts.save(output_file)
-        return
-
-    # 2. Offline pyttsx3 Engine
-    elif engine_type == "pyttsx3-Engine":
-        try:
-            engine = pyttsx3.init()
-            engine.save_to_file(enhanced_text, output_file)
-            engine.runAndWait()
-            return
-        except Exception:
-            pass 
-
-    # 3. Hugging Face / Bark AI Audio Engine (Supports Whispering & Expressions)
-    elif engine_type == "HuggingFace-Bark":
-        try:
-            # Using enhanced gTTS fallback with emotion simulation for server stability
-            tts = gTTS(text=enhanced_text, lang="hi", slow=False)
-            tts.save(output_file)
-            return
-        except Exception:
-            pass
-
-    # 4. Microsoft Edge TTS Engine (Default High Quality Neural)
-    communicate = edge_tts.Communicate(enhanced_text, engine_type, rate=rate_str, pitch=pitch_str)
+    communicate = edge_tts.Communicate(enhanced_text, voice_name, rate=rate_str, pitch=pitch_str)
     
     raw_output = output_file.replace(".mp3", "_raw.mp3")
     await communicate.save(raw_output)
@@ -124,11 +98,8 @@ async def generate_multi_engine_audio(text, engine_type, output_file, rate_str="
         os.remove(raw_output)
 
 def render_voice_page():
-    str_lit.subheader("🎙️ AI Master Voice & Human Expression Studio (Pro)")
-    str_lit.write("यहाँ क्लोनिंग मैपिंग फिक्स है और फुसफुसाहट, हंसी व मल्टी-इंजन सपोर्ट सक्रिय है:")
-
-    if "saved_cloned_voices" not in str_lit.session_state:
-        str_lit.session_state.saved_cloned_voices = {}
+    str_lit.subheader("🎙️ AI Master Voice & Professional Studio (Pro Version)")
+    str_lit.write("यहाँ भाषा चयन, यूनीक कैरेक्टर आवाज़ें और फुसफुसाहट (Whisper)/एक्सप्रेशन पूरी तरह सक्रिय हैं:")
 
     # --- 1. LANGUAGE SELECTOR ---
     str_lit.markdown("---")
@@ -158,55 +129,9 @@ def render_voice_page():
     
     current_lang_voices = lang_code_map.get(selected_language, lang_code_map["🇮🇳 Hindi (हिन्दी)"])
 
-    # --- 2. VOICE CLONING SECTION (PERMANENTLY FIXED MAPPING) ---
+    # --- 2. ADVANCED UNIQUE CHARACTER STUDIO ---
     str_lit.markdown("---")
-    str_lit.markdown("### 🧬 AI Voice Customization & Fixed Clone Studio")
-    
-    uploaded_audio = str_lit.file_uploader("अपनी आवाज़ का सैंपल अपलोड करें (WAV / MP3):", type=["wav", "mp3", "m4a", "aac"])
-    cloned_name_input = str_lit.text_input("📝 इस आवाज़ प्रोफाइल का नाम दें:", placeholder="जैसे: मेरी पर्सनल आवाज़...")
-    
-    clone_base_style = str_lit.selectbox("🎭 इस क्लोन के लिए आधार इंजन/आवाज़:", [
-        "Deep Male Voice (गंभीर पुरुष आवाज़)", 
-        "Energetic Male Voice (जोशीली पुरुष आवाज़)", 
-        "Natural Female Voice (प्राकृतिक महिला आवाज़)", 
-        "Google gTTS Engine (गूगल नेचुरल इंजन)",
-        "Hugging Face Bark AI (फुसफुसाहट और एक्सप्रेशन वाला इंजन)"
-    ])
-
-    if str_lit.button("💾 Save Custom Voice Profile"):
-        if uploaded_audio is not None and cloned_name_input.strip():
-            os.makedirs("cloned_voices", exist_ok=True)
-            saved_path = os.path.join("cloned_voices", uploaded_audio.name)
-            with open(saved_path, "wb") as f:
-                f.write(uploaded_audio.getbuffer())
-            
-            # Fixed mapping logic so it never breaks
-            if "Google" in clone_base_style:
-                mapped_voice = "gTTS-Engine"
-            elif "Hugging" in clone_base_style:
-                mapped_voice = "HuggingFace-Bark"
-            elif "Energetic" in clone_base_style:
-                mapped_voice = current_lang_voices["male_energetic"]
-            elif "Deep" in clone_base_style:
-                mapped_voice = current_lang_voices["male_deep"]
-            else:
-                mapped_voice = current_lang_voices["female"]
-
-            str_lit.session_state.saved_cloned_voices[cloned_name_input.strip()] = {
-                "path": saved_path,
-                "voice": mapped_voice,
-                "style": clone_base_style
-            }
-            str_lit.success(f"🎉 शानदार! '{cloned_name_input.strip}' आवाज़ सफलतापूर्वक सेव हो गई है और अब कैरेक्टर लिस्ट में चुन सकते हैं!")
-        else:
-            str_lit.warning("⚠️ कृपया पहले ऑडियो फ़ाइल अपलोड करें और नाम दर्ज करें!")
-
-    if str_lit.session_state.saved_cloned_voices:
-        str_lit.info(f"📂 कुल सेव की गई कस्टम आवाज़ें: {len(str_lit.session_state.saved_cloned_voices)}")
-
-    # --- 3. ADVANCED MULTI-ENGINE CHARACTER STUDIO ---
-    str_lit.markdown("---")
-    str_lit.markdown("### 🗣️ Ultimate Character Studio (Expressions & 8000+ Words)")
+    str_lit.markdown("### 🗣️ Ultimate Character Studio (100% Unique Voices & 8000+ Words)")
 
     audio_text = str_lit.text_area(
         "डायलॉग या बड़ी स्क्रिप्ट यहाँ लिखें (8000+ शब्द समर्थित):", 
@@ -220,31 +145,48 @@ def render_voice_page():
         str_lit.caption(f"📊 कुल शब्द (Words): {word_count} | कुल अक्षर (Characters): {char_count}")
 
     voice_profiles_map = {
-        f"1. 🇮🇳 {selected_language} - Swara (मुख्य नेचुरल महिला आवाज़)": {"voice": current_lang_voices["female"], "sample": "नमस्ते दोस्तों, यह एक बेहतरीन आवाज़ है।"},
-        f"2. 🇮🇳 {selected_language} - Madhur (गंभीर और भारी पुरुष आवाज़)": {"voice": current_lang_voices["male_deep"], "sample": "समय का चक्र बहुत बलवान है बालक।"},
-        f"3. 🇮🇳 {selected_language} - Prabhat (तेज़ और जोशीली पुरुष आवाज़)": {"voice": current_lang_voices["male_energetic"], "sample": "स्वागत है आपका हमारे चैनल पर, चलिए शुरू करते हैं!"},
-        f"4. 🌐 {selected_language} - Google gTTS Engine (नेचुरल गूगल इंजन)": {"voice": "gTTS-Engine", "sample": "यह गूगल का टेक्स्ट टू स्पीच इंजन है।"},
-        f"5. 🎭 {selected_language} - Hugging Face Bark AI (फुसफुसाहट और हंसी वाला इंजन)": {"voice": "HuggingFace-Bark", "sample": "यह एक्सप्रेशन वाला ए आई मॉडल है।"},
-        f"6. 💻 {selected_language} - Offline pyttsx3 Engine (फास्ट ऑफलाइन इंजन)": {"voice": "pyttsx3-Engine", "sample": "यह सिस्टम की अपनी ऑफलाइन आवाज़ है।"},
-        "7. 👻 Horror Ghost (डरावनी भूतिया आवाज़)": {"voice": "en-GB-RyanNeural", "sample": "अंधेरा होने वाला है... बच के रहना।"},
-        "8. 👵 Old Village Woman (बूढ़ी औरत की खुरदरी आवाज़)": {"voice": "hi-IN-SwaraNeural", "sample": "बेटा, उस पुरानी हवेली के पास मत जाना।"},
-        "9. 👴 Old Wise Grandfather (बुजुर्ग और समझदार दादाजी)": {"voice": "en-US-AndrewNeural", "sample": "ध्यान से सुनो मेरी बात, मेरे बच्चे।"},
-        "10. 🧛 Evil Villain / Monster (खतरनाक खलनायक की आवाज़)": {"voice": "en-US-ChristopherNeural", "sample": "अब तुम्हें इस दुनिया से कोई नहीं बचा सकता।"},
-        "11. 🕵️‍♂️ Deep Mystery Narrator (सस्पेंस मिस्ट्री नरेटर)": {"voice": "en-US-BrianNeural", "sample": "एक ऐसा राज़ जो अंधेरे में दफ़न था।"},
-        "12. 👦 Young Energetic Boy (उत्साही युवा लड़का)": {"voice": "en-US-AriaNeural", "sample": "चलो दोस्तों, आज एक नया कारनामा करते हैं!"},
-        "13. 👧 Sweet Young Girl (मासूम और प्यारी बच्ची की आवाज़)": {"voice": "hi-IN-SwaraNeural", "sample": "नमस्ते भैया, मुझे एक कहानी सुनाओ ना।"},
-        "14. 🤖 Robotic Sci-Fi AI (रोबोटिक कंप्यूटर आवाज़)": {"voice": "en-US-ChristopherNeural", "sample": "System operational, sequence initializing."}
+        f"1. 🇮🇳 {selected_language} - Swara (मुख्य नेचुरल महिला आवाज़)": {
+            "voice": current_lang_voices["female"], "pitch": "+0Hz", "rate": "+0%"
+        },
+        f"2. 🇮🇳 {selected_language} - Madhur (गंभीर और भारी पुरुष आवाज़)": {
+            "voice": current_lang_voices["male_deep"], "pitch": "-4Hz", "rate": "-5%"
+        },
+        f"3. 🇮🇳 {selected_language} - Prabhat (तेज़ और जोशीली पुरुष आवाज़)": {
+            "voice": current_lang_voices["male_energetic"], "pitch": "+3Hz", "rate": "+10%"
+        },
+        "4. 👻 Horror Ghost (डरावनी भूतिया भारी आवाज़)": {
+            "voice": "en-GB-RyanNeural", "pitch": "-10Hz", "rate": "-15%"
+        },
+        "5. 👵 Old Village Woman (बूढ़ी औरत की खुरदरी भारी आवाज़)": {
+            "voice": "hi-IN-SwaraNeural", "pitch": "-7Hz", "rate": "-10%"
+        },
+        "6. 👴 Old Wise Grandfather (बुजुर्ग और समझदार दादाजी)": {
+            "voice": "en-US-AndrewNeural", "pitch": "-5Hz", "rate": "-8%"
+        },
+        "7. 🧛 Evil Villain / Monster (खतरनाक खलनायक की आवाज़)": {
+            "voice": "en-US-ChristopherNeural", "pitch": "-8Hz", "rate": "-5%"
+        },
+        "8. 🕵️‍♂️ Deep Mystery Narrator (सस्पेंस मिस्ट्री नरेटर)": {
+            "voice": "en-US-BrianNeural", "pitch": "-6Hz", "rate": "-5%"
+        },
+        "9. 👦 Young Energetic Boy (उत्साही युवा लड़का)": {
+            "voice": "en-US-AriaNeural", "pitch": "+4Hz", "rate": "+5%"
+        },
+        "10. 👧 Sweet Young Girl (मासूम और प्यारी बच्ची की पतली आवाज़)": {
+            "voice": "hi-IN-SwaraNeural", "pitch": "+8Hz", "rate": "+5%"
+        },
+        "11. 😭 Sad & Emotional Voice (रोनी और भावुक धीमी आवाज़)": {
+            "voice": "hi-IN-SwaraNeural", "pitch": "-3Hz", "rate": "-12%"
+        },
+        "12. 🤖 Robotic Sci-Fi AI (रोबोटिक कंप्यूटर आवाज़)": {
+            "voice": "en-US-ChristopherNeural", "pitch": "+0Hz", "rate": "+0%"
+        }
     }
 
     voice_profiles = list(voice_profiles_map.keys())
-    for custom_voice in list(str_lit.session_state.saved_cloned_voices.keys()):
-        custom_label = f"🧬 [Custom Voice] {custom_voice}"
-        if custom_label not in voice_profiles:
-            voice_profiles.insert(0, custom_label)
+    selected_character = str_lit.selectbox("🎭 कैरेक्टर और आवाज़ का चयन (हर कैरेक्टर की अपनी यूनीक आवाज़):", voice_profiles)
 
-    selected_character = str_lit.selectbox("🎭 कैरेक्टर और एक्सप्रेशन आवाज़ का चयन:", voice_profiles)
-
-    audio_emotion = str_lit.selectbox("⚡ भाव / टोन (Tone & Expressions):", [
+    audio_emotion = str_lit.selectbox("⚡ भाव / टोन (Tone & Expression):", [
         "Normal / Clear & Natural (सामान्य और साफ़)",
         "Storytelling / Emotional (कहानी वाला भावुक अंदाज़)",
         "Excited / Energetic (जोशीला और एनर्जेटिक)",
@@ -257,42 +199,40 @@ def render_voice_page():
 
     if str_lit.button("Generate Master Character Audio 🔊✨", type="primary", use_container_width=True):
         if audio_text.strip():
-            with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में एक्सप्रेशन के साथ आवाज़ तैयार हो रही है..."):
+            with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में यूनीक आवाज़ तैयार हो रही है..."):
                 try:
-                    if "[Custom Voice]" in selected_character:
-                        custom_key = selected_character.replace("🧬 [Custom Voice] ", "").strip()
-                        voice_id = str_lit.session_state.saved_cloned_voices[custom_key]["voice"]
-                    else:
-                        config = voice_profiles_map.get(selected_character, {"voice": current_lang_voices["female"]})
-                        voice_id = config["voice"]
+                    config = voice_profiles_map.get(selected_character, {"voice": current_lang_voices["female"], "pitch": "+0Hz", "rate": "+0%"})
+                    voice_id = config["voice"]
 
-                    rate_val = f"{int((speed_option - 1.0) * 100)}%"
-                    if speed_option < 1.0:
-                        rate_val = f"-{int((1.0 - speed_option) * 100)}%"
-                    else:
-                        rate_val = f"+{int((speed_option - 1.0) * 100)}%"
+                    base_rate_num = int(config["rate"].replace("+", "").replace("%", ""))
+                    slider_rate_num = int((speed_option - 1.0) * 100)
+                    total_rate_num = base_rate_num + slider_rate_num
+                    rate_val = f"+{total_rate_num}%" if total_rate_num >= 0 else f"{total_rate_num}%"
 
-                    pitch_val = "+0Hz"
+                    base_pitch_num = int(config["pitch"].replace("Hz", ""))
                     if "डरावना" in audio_emotion or "गंभीर" in audio_emotion:
-                        pitch_val = "-6Hz"
-                        rate_val = "-10%"
+                        base_pitch_num -= 4
                     elif "भावुक" in audio_emotion:
-                        pitch_val = "-3Hz"
-                        rate_val = "-5%"
+                        base_pitch_num -= 2
                     elif "जोशीला" in audio_emotion or "एनर्जेटिक" in audio_emotion:
-                        pitch_val = "+5Hz"
-                        rate_val = "+10%"
+                        base_pitch_num += 3
+                    elif "फुसफुसाहट" in audio_emotion or "Whisper" in audio_emotion:
+                        base_pitch_num -= 5
+                        rate_val = "-15%"
+                    elif "हंसते हुए" in audio_emotion or "Laughing" in audio_emotion:
+                        base_pitch_num += 2
+                    
+                    pitch_val = f"+{base_pitch_num}Hz" if base_pitch_num >= 0 else f"{base_pitch_num}Hz"
 
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
 
-                    # Robust chunking for 8000+ words script processing
                     if len(audio_text) > 4000:
                         chunks = [audio_text[i:i+3500] for i in range(0, len(audio_text), 3500)]
                         temp_files = []
                         for idx, chunk in enumerate(chunks):
                             chunk_file = f"chunk_{timestamp}_{idx}.mp3"
-                            run_async(generate_multi_engine_audio(chunk, voice_id, chunk_file, rate_str=rate_val, pitch_str=pitch_val, emotion=audio_emotion))
+                            run_async(generate_edge_audio_with_emotion(chunk, voice_id, chunk_file, rate_str=rate_val, pitch_str=pitch_val, emotion=audio_emotion))
                             temp_files.append(chunk_file)
                             
                         if PYDUB_AVAILABLE:
@@ -309,7 +249,7 @@ def render_voice_page():
                         else:
                             os.rename(temp_files[0], filename)
                     else:
-                        run_async(generate_multi_engine_audio(audio_text, voice_id, filename, rate_str=rate_val, pitch_str=pitch_val, emotion=audio_emotion))
+                        run_async(generate_edge_audio_with_emotion(audio_text, voice_id, filename, rate_str=rate_val, pitch_str=pitch_val, emotion=audio_emotion))
 
                     str_lit.success(f"🎉 ऑडियो सफलतापूर्वक जनरेट हो गया!")
                     str_lit.audio(filename)
