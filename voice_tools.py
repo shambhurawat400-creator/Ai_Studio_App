@@ -89,7 +89,7 @@ async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_s
 
 def render_voice_page():
     str_lit.subheader("🎙️ AI Master Voice & Unique Character Studio (Pro Version)")
-    str_lit.write("यहाँ भाषा चयन, 100% अलग आवाज़ें, कस्टम वॉयस क्लोनिंग और 8000+ शब्दों की बड़ी स्क्रिप्ट का सपोर्ट पूरी तरह काम कर रहा है:")
+    str_lit.write("यहाँ सभी कैरेक्टर्स की आवाज़ें बिल्कुल अलग, यूनिक और नेचुरल हैं। साथ ही 8000+ शब्दों की बड़ी स्क्रिप्ट का समर्थन है:")
 
     if "saved_cloned_voices" not in str_lit.session_state:
         str_lit.session_state.saved_cloned_voices = {}
@@ -153,7 +153,7 @@ def render_voice_page():
                 "path": saved_path,
                 "voice": mapped_voice
             }
-            str_lit.success(f"🎉 शानदार! '{cloned_name_input.strip}' आवाज़ सफलतापूर्वक सेव हो गई है और कैरेक्टर लिस्ट में जुड़ गई है!")
+            str_lit.success(f"🎉 शानदार! '{cloned_name_input.strip}' आवाज़ सफलतापूर्वक सेव हो गई है!")
         else:
             str_lit.warning("⚠️ कृपया पहले ऑडियो फ़ाइल अपलोड करें और नाम दर्ज करें!")
 
@@ -175,7 +175,7 @@ def render_voice_page():
         char_count = len(audio_text)
         str_lit.caption(f"📊 कुल शब्द (Words): {word_count} | कुल अक्षर (Characters): {char_count}")
 
-    # 12 Unique Distinct Voices mapped properly so Madhur and Prabhat / others don't overlap
+    # 12 Unique Distinct Voices mapped properly
     voice_profiles_map = {
         f"1. 🇮🇳 {selected_language} - Swara (मुख्य नेचुरल महिला आवाज़)": {"voice": current_lang_voices["female"], "sample": "नमस्ते दोस्तों, यह एक बेहतरीन आवाज़ है।"},
         f"2. 🇮🇳 {selected_language} - Madhur (गंभीर और भारी पुरुष आवाज़)": {"voice": current_lang_voices["male_deep"], "sample": "समय का चक्र बहुत बलवान है बालक।"},
@@ -212,7 +212,6 @@ def render_voice_page():
         if audio_text.strip():
             with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में यूनीक आवाज़ तैयार हो रही है..."):
                 try:
-                    # FIX: Correctly grab voice id whether it is a custom voice or built-in character
                     if "[Custom Voice]" in selected_character:
                         custom_key = selected_character.replace("🧬 [Custom Voice] ", "").strip()
                         voice_id = str_lit.session_state.saved_cloned_voices[custom_key]["voice"]
@@ -240,11 +239,9 @@ def render_voice_page():
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
 
-                    # Robust chunking support for 8000+ words script processing
+                    # Safe chunking for 8000+ words without crashing
                     if len(audio_text) > 4000:
                         chunks = [audio_text[i:i+3500] for i in range(0, len(audio_text), 3500)]
-                        combined_audio = AudioSegment.empty() if PYDUB_AVAILABLE else None
-                        
                         temp_files = []
                         for idx, chunk in enumerate(chunks):
                             chunk_file = f"chunk_{timestamp}_{idx}.mp3"
@@ -252,12 +249,16 @@ def render_voice_page():
                             temp_files.append(chunk_file)
                             
                         if PYDUB_AVAILABLE:
-                            for tf in temp_files:
+                            combined_audio = AudioSegment.from_file(temp_files[0])
+                            for tf in temp_files[1:]:
                                 if os.path.exists(tf):
                                     combined_audio += AudioSegment.from_file(tf)
                             combined_audio.export(filename, format="mp3")
                             for tf in temp_files:
-                                os.remove(tf)
+                                try:
+                                    os.remove(tf)
+                                except:
+                                    pass
                         else:
                             os.rename(temp_files[0], filename)
                     else:
