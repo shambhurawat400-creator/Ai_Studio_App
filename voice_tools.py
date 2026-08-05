@@ -19,18 +19,18 @@ class StudioAudioEnhancer:
     @staticmethod
     def apply_smart_pauses_and_breathing(text: str, emotion: str) -> str:
         """Inserts natural breathing tokens and strategic sentence/punctuation pauses for a human touch."""
-        sentences = text.split('.')
+        sentences = re.split(r'(?<=[.!?])\s+', text)
         processed_sentences = []
         
         for sentence in sentences:
             sentence = sentence.strip()
             if not sentence:
                 continue
-                
-            if len(sentence.split()) > 8:
+            
+            # Human breathing and realistic rhythm pacing
+            if len(sentence.split()) > 6:
                 sentence = f"... {sentence}"
             
-            # Pro-level human breathing and emotional pacing
             if "डरावना" in emotion or "गंभीर" in emotion:
                 sentence = sentence.replace(",", "...... ")
                 sentence = sentence.replace("!", "...... ")
@@ -55,8 +55,8 @@ class StudioAudioEnhancer:
             return audio_bytes
         try:
             audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
-            audio = effects.compress_dynamic_range(audio, threshold=-18.0, ratio=2.0, attack=5.0, release=50.0)
-            audio = effects.normalize(audio, headroom=1.0)
+            audio = effects.compress_dynamic_range(audio, threshold=-16.0, ratio=2.5, attack=4.0, release=40.0)
+            audio = effects.normalize(audio, headroom=0.5)
             
             out_buffer = io.BytesIO()
             audio.export(out_buffer, format=output_format, bitrate="320k")
@@ -93,7 +93,7 @@ async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_s
 
 def render_voice_page():
     str_lit.subheader("🎙️ AI Master Voice & Character Studio (All-in-One Pro)")
-    str_lit.write("सभी कैरेक्टर्स, परफेक्ट इमोशंस, स्मार्ट पॉज़ और स्टूडियो मास्टरिंग के साथ:")
+    str_lit.write("सभी कैरेक्टर्स, परफेक्ट इमोशंस, ह्यूमन ब्रीदिंग पॉज़ और स्टूडियो मास्टरिंग के साथ:")
 
     # --- Initialize Permanent Saved Voices in Session State ---
     if "saved_cloned_voices" not in str_lit.session_state:
@@ -106,7 +106,6 @@ def render_voice_page():
     uploaded_audio = str_lit.file_uploader("अपनी आवाज़ का सैंपल अपलोड करें (WAV / MP3 / AAC):", type=["wav", "mp3", "m4a", "aac"])
     cloned_name_input = str_lit.text_input("📝 इस आवाज़ प्रोफाइल का नाम दें:", placeholder="जैसे: मेरी आवाज़, राहुल...")
     
-    # Base voice style option for custom clone mapping
     clone_base_style = str_lit.selectbox("🎭 इस क्लोन के लिए आधार आवाज़ चुनें:", [
         "🇮🇳 Madhur (Deep Male Voice)", 
         "🇮🇳 Swara (Natural Female Voice)", 
@@ -121,6 +120,7 @@ def render_voice_page():
             with open(saved_path, "wb") as f:
                 f.write(uploaded_audio.getbuffer())
             
+            # Map exact neural voice based on selection
             mapped_voice = "hi-IN-MadhurNeural"
             if "Swara" in clone_base_style:
                 mapped_voice = "hi-IN-SwaraNeural"
@@ -129,11 +129,12 @@ def render_voice_page():
             elif "Ananya" in clone_base_style:
                 mapped_voice = "hi-IN-SwaraNeural"
 
+            # Save permanently in session state session dictionary
             str_lit.session_state.saved_cloned_voices[cloned_name_input.strip()] = {
                 "path": saved_path,
                 "voice": mapped_voice
             }
-            str_lit.success(f"🎉 शानदार! '{cloned_name_input.strip}' प्रोफाइल सफलतापूर्वक सेव और ऐड हो गई है!")
+            str_lit.success(f"🎉 शानदार! '{cloned_name_input.strip}' प्रोफाइल सफलतापूर्वक सेव हो गई है और कैरेक्टर लिस्ट में जोड़ दी गई है!")
         else:
             str_lit.warning("⚠️ कृपया पहले ऑडियो फ़ाइल अपलोड करें और उसका नाम सही से दर्ज करें!")
 
@@ -173,9 +174,12 @@ def render_voice_page():
         "🧙‍♂️ Wise Wizard / Sadhu (रहस्यमयी साधु या जादूगर)": {"voice": "hi-IN-MadhurNeural", "sample": "समय का चक्र बहुत बलवान है बालक।"}
     }
 
+    # Automatically add saved cloned voices into the character dropdown list permanently
     voice_profiles = list(voice_profiles_map.keys())
     for custom_voice in list(str_lit.session_state.saved_cloned_voices.keys()):
-        voice_profiles.insert(0, f"🧬 [Custom] {custom_voice}")
+        custom_label = f"🧬 [Custom] {custom_voice}"
+        if custom_label not in voice_profiles:
+            voice_profiles.insert(0, custom_label)
 
     selected_character = str_lit.selectbox("🎭 कैरेक्टर और रियलिस्टिक आवाज़ का चयन:", voice_profiles)
 
@@ -208,7 +212,7 @@ def render_voice_page():
         if audio_text.strip():
             with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में हाई-क्वालिटी रियलिस्टिक आवाज़ तैयार हो रही है..."):
                 try:
-                    # Fix: Properly fetch and route custom cloned voice ID instead of falling back to default
+                    # FIX: Correctly grab voice id whether it is custom or built-in character
                     if "[Custom]" in selected_character:
                         custom_key = selected_character.replace("🧬 [Custom] ", "").strip()
                         voice_id = str_lit.session_state.saved_cloned_voices[custom_key]["voice"]
@@ -224,11 +228,14 @@ def render_voice_page():
 
                     pitch_val = "+0Hz"
                     if "डरावना" in audio_emotion or "गंभीर" in audio_emotion:
-                        pitch_val = "-5Hz"
+                        pitch_val = "-6Hz"
+                        rate_val = "-10%"
                     elif "भावुक" in audio_emotion:
                         pitch_val = "-3Hz"
+                        rate_val = "-5%"
                     elif "जोशीला" in audio_emotion or "एनर्जेटिक" in audio_emotion:
-                        pitch_val = "+4Hz"
+                        pitch_val = "+5Hz"
+                        rate_val = "+10%"
 
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
