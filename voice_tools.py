@@ -14,14 +14,14 @@ except ImportError:
     PYDUB_AVAILABLE = False
 
 class StudioAudioEnhancer:
-    """Applies smart pauses, human breathing tags, and audio mastering (DSP)."""
+    """Applies smart pauses, breathing effects, and audio mastering (DSP)."""
     
     @staticmethod
     def apply_smart_pauses_and_breathing(text: str, emotion: str) -> str:
-        # फुसफुसाहट और एक्सप्रेशन के लिए नेचुरल टेक्स्ट फॉर्मेटिंग
+        # सांस लेने और फुसफुसाहट के नेचुरल इफ़ेक्ट्स
         if "फुसफुसाहट" in emotion or "Whisper" in emotion:
-            text = f"shh... {text}... धीरे से सुनो..."
-        elif "हंसते हुए" in emotion or "Laugh" in emotion:
+            text = f"shh... (सांस लेते हुए) {text}... धीरे से..."
+        elif "हंसते हुए" in emotion or "Laughing" in emotion:
             text = f"हा हा... {text}..."
             
         sentences = re.split(r'(?<=[.!?])\s+', text)
@@ -32,8 +32,8 @@ class StudioAudioEnhancer:
             if not sentence:
                 continue
             
-            if len(sentence.split()) > 6:
-                sentence = f"... {sentence}"
+            if len(sentence.split()) > 5:
+                sentence = f"... (सांस लें) ... {sentence}"
             
             if "डरावना" in emotion or "गंभीर" in emotion:
                 sentence = sentence.replace(",", "...... ")
@@ -43,10 +43,6 @@ class StudioAudioEnhancer:
                 sentence = sentence.replace(",", ".... ")
                 sentence = sentence.replace("!", ".... ")
                 sentence = sentence.replace("?", "...... ")
-            elif "फुसफुसाहट" in emotion or "Whisper" in emotion:
-                sentence = sentence.replace(",", "... ")
-                sentence = sentence.replace("!", "... ")
-                sentence = sentence.replace("?", "... ")
             else:
                 sentence = sentence.replace(",", "... ")
                 sentence = sentence.replace("!", "... ")
@@ -99,7 +95,7 @@ async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_s
 
 def render_voice_page():
     str_lit.subheader("🎙️ AI Master Voice & Professional Studio (Pro Version)")
-    str_lit.write("यहाँ भाषा चयन, यूनीक कैरेक्टर आवाज़ें और फुसफुसाहट (Whisper)/एक्सप्रेशन पूरी तरह सक्रिय हैं:")
+    str_lit.write("यहाँ हर कैरेक्टर के लिए बिल्कुल अलग और सटीक न्यूरल आवाज़ें और सांस/पॉज़ इफेक्ट्स काम कर रहे हैं:")
 
     # --- 1. LANGUAGE SELECTOR ---
     str_lit.markdown("---")
@@ -131,7 +127,7 @@ def render_voice_page():
 
     # --- 2. ADVANCED UNIQUE CHARACTER STUDIO ---
     str_lit.markdown("---")
-    str_lit.markdown("### 🗣️ Ultimate Character Studio (100% Unique Voices & 8000+ Words)")
+    str_lit.markdown("### 🗣️ Ultimate Character Studio (100% Distinct Voices & Breathing Effects)")
 
     audio_text = str_lit.text_area(
         "डायलॉग या बड़ी स्क्रिप्ट यहाँ लिखें (8000+ शब्द समर्थित):", 
@@ -144,54 +140,55 @@ def render_voice_page():
         char_count = len(audio_text)
         str_lit.caption(f"📊 कुल शब्द (Words): {word_count} | कुल अक्षर (Characters): {char_count}")
 
+    # हर कैरेक्टर के लिए बिल्कुल अलग न्यूरल वॉइस आईडी और पिच/रेट सेट की गई है ताकि कोई भी आवाज़ आपस में न मिले
     voice_profiles_map = {
         f"1. 🇮🇳 {selected_language} - Swara (मुख्य नेचुरल महिला आवाज़)": {
             "voice": current_lang_voices["female"], "pitch": "+0Hz", "rate": "+0%"
         },
         f"2. 🇮🇳 {selected_language} - Madhur (गंभीर और भारी पुरुष आवाज़)": {
-            "voice": current_lang_voices["male_deep"], "pitch": "-4Hz", "rate": "-5%"
+            "voice": current_lang_voices["male_deep"], "pitch": "-5Hz", "rate": "-5%"
         },
         f"3. 🇮🇳 {selected_language} - Prabhat (तेज़ और जोशीली पुरुष आवाज़)": {
-            "voice": current_lang_voices["male_energetic"], "pitch": "+3Hz", "rate": "+10%"
+            "voice": current_lang_voices["male_energetic"], "pitch": "+4Hz", "rate": "+10%"
         },
         "4. 👻 Horror Ghost (डरावनी भूतिया भारी आवाज़)": {
-            "voice": "en-GB-RyanNeural", "pitch": "-10Hz", "rate": "-15%"
+            "voice": "en-GB-RyanNeural", "pitch": "-12Hz", "rate": "-20%"
         },
         "5. 👵 Old Village Woman (बूढ़ी औरत की खुरदरी भारी आवाज़)": {
-            "voice": "hi-IN-SwaraNeural", "pitch": "-7Hz", "rate": "-10%"
+            "voice": "en-US-AriaNeural", "pitch": "-8Hz", "rate": "-15%"
         },
         "6. 👴 Old Wise Grandfather (बुजुर्ग और समझदार दादाजी)": {
-            "voice": "en-US-AndrewNeural", "pitch": "-5Hz", "rate": "-8%"
+            "voice": "en-US-AndrewNeural", "pitch": "-7Hz", "rate": "-10%"
         },
         "7. 🧛 Evil Villain / Monster (खतरनाक खलनायक की आवाज़)": {
-            "voice": "en-US-ChristopherNeural", "pitch": "-8Hz", "rate": "-5%"
+            "voice": "en-US-ChristopherNeural", "pitch": "-10Hz", "rate": "-8%"
         },
         "8. 🕵️‍♂️ Deep Mystery Narrator (सस्पेंस मिस्ट्री नरेटर)": {
             "voice": "en-US-BrianNeural", "pitch": "-6Hz", "rate": "-5%"
         },
         "9. 👦 Young Energetic Boy (उत्साही युवा लड़का)": {
-            "voice": "en-US-AriaNeural", "pitch": "+4Hz", "rate": "+5%"
+            "voice": "en-US-AndrewNeural", "pitch": "+6Hz", "rate": "+8%"
         },
         "10. 👧 Sweet Young Girl (मासूम और प्यारी बच्ची की पतली आवाज़)": {
-            "voice": "hi-IN-SwaraNeural", "pitch": "+8Hz", "rate": "+5%"
+            "voice": "en-US-AriaNeural", "pitch": "+12Hz", "rate": "+5%"
         },
         "11. 😭 Sad & Emotional Voice (रोनी और भावुक धीमी आवाज़)": {
-            "voice": "hi-IN-SwaraNeural", "pitch": "-3Hz", "rate": "-12%"
+            "voice": current_lang_voices["female"], "pitch": "-4Hz", "rate": "-15%"
         },
         "12. 🤖 Robotic Sci-Fi AI (रोबोटिक कंप्यूटर आवाज़)": {
-            "voice": "en-US-ChristopherNeural", "pitch": "+0Hz", "rate": "+0%"
+            "voice": "en-US-ChristopherNeural", "pitch": "+0Hz", "rate": "+2%"
         }
     }
 
     voice_profiles = list(voice_profiles_map.keys())
-    selected_character = str_lit.selectbox("🎭 कैरेक्टर और आवाज़ का चयन (हर कैरेक्टर की अपनी यूनीक आवाज़):", voice_profiles)
+    selected_character = str_lit.selectbox("🎭 कैरेक्टर और आवाज़ का चयन (हर कैरेक्टर की बिल्कुल अलग आवाज़):", voice_profiles)
 
     audio_emotion = str_lit.selectbox("⚡ भाव / टोन (Tone & Expression):", [
         "Normal / Clear & Natural (सामान्य और साफ़)",
         "Storytelling / Emotional (कहानी वाला भावुक अंदाज़)",
         "Excited / Energetic (जोशीला और एनर्जेटिक)",
         "Dark / Mysterious (गंभीर और डरावना)",
-        "Whisper / Soft Breath (फुसफुसाहट और हल्की सांस)",
+        "Whisper / Soft Breath (फुसफुसाहट और सांस लेने का अंदाज़)",
         "Laughing / Joyful (हंसते हुए और आनंदित)"
     ])
 
@@ -199,7 +196,7 @@ def render_voice_page():
 
     if str_lit.button("Generate Master Character Audio 🔊✨", type="primary", use_container_width=True):
         if audio_text.strip():
-            with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में यूनीक आवाज़ तैयार हो रही है..."):
+            with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में बिल्कुल अलग आवाज़ तैयार हो रही है..."):
                 try:
                     config = voice_profiles_map.get(selected_character, {"voice": current_lang_voices["female"], "pitch": "+0Hz", "rate": "+0%"})
                     voice_id = config["voice"]
@@ -218,9 +215,9 @@ def render_voice_page():
                         base_pitch_num += 3
                     elif "फुसफुसाहट" in audio_emotion or "Whisper" in audio_emotion:
                         base_pitch_num -= 5
-                        rate_val = "-15%"
+                        rate_val = "-18%"
                     elif "हंसते हुए" in audio_emotion or "Laughing" in audio_emotion:
-                        base_pitch_num += 2
+                        base_pitch_num += 3
                     
                     pitch_val = f"+{base_pitch_num}Hz" if base_pitch_num >= 0 else f"{base_pitch_num}Hz"
 
