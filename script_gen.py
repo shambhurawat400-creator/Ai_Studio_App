@@ -5,15 +5,13 @@ def render_script_page(groq_client):
     st.subheader("📜 AI Video & Story Script Writer (Pro Cinematic Level)")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए एक दम प्रोफेशनल और सिनेमैटिक स्क्रिप्ट तैयार कर सकते हैं:")
 
-    # यहाँ अपनी बिल्कुल नई और ताज़ा Groq API Key डालें
-    NEW_SECURE_API_KEY = "यहाँ_अपनी_नई_ग्रोक_की_डाले"
+    # सीधा और पक्का तरीका (यहाँ अपनी असली 'gsk_...' से शुरू होने वाली की सीधे पेस्ट कर दें)
+    DIRECT_KEY = "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"
     
-    active_client = groq_client
-    if not active_client or "यहाँ" in NEW_SECURE_API_KEY:
-        try:
-            active_client = Groq(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)
-        except Exception:
-            pass
+    try:
+        active_client = Groq(api_key=DIRECT_KEY)
+    except Exception as e:
+        active_client = None
 
     topic = st.text_input("स्क्रिप्ट का टॉपिक/विषय दर्ज करें:", placeholder="जैसे: Horror story near a haunted well in an ancient village")
     
@@ -42,8 +40,8 @@ def render_script_page(groq_client):
     if st.button("Generate Pro Cinematic Script ✍️🎬", type="primary", use_container_width=True):
         if not topic.strip():
             st.warning("कृपया पहले टॉपिक दर्ज करें!")
-        elif not active_client or "यहाँ" in NEW_SECURE_API_KEY:
-            st.error("🚨 कृपया वैध (Valid) Groq API Key दर्ज करें!")
+        elif not active_client:
+            st.error("🚨 API Client इनिशियलाइज नहीं हो पाया!")
         else:
             with st.spinner("प्रो AI डायरेक्टर स्क्रिप्ट, विजुअल क्यूज और डायलॉग तैयार कर रहा है..."):
                 try:
