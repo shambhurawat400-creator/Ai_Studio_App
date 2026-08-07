@@ -5,13 +5,12 @@ def render_script_page(groq_client):
     st.subheader("📜 AI Video & Story Script Writer (Pro Cinematic Level)")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए एक दम प्रोफेशनल और सिनेमैटिक स्क्रिप्ट तैयार कर सकते हैं:")
 
-    # सुरक्षा के लिए ऐप के अंदर ही सुरक्षित इनपुट बॉक्स (यहाँ आप अपनी की डाल सकते हैं)
-    api_key_input = st.text_input("अपनी Groq API Key दर्ज करें:", type="password", placeholder="gsk_...")
-
+    # यह बैकग्राउंड में ऑटोमैटिक Streamlit Secrets से API Key ले लेगा (यूज़र को कुछ नहीं दिखेगा)
     active_client = groq_client
-    if api_key_input.strip():
+    if not active_client:
         try:
-            active_client = Groq(api_key=api_key_input.strip())
+            if "GROQ_API_KEY" in st.secrets:
+                active_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
         except Exception:
             pass
 
@@ -43,7 +42,7 @@ def render_script_page(groq_client):
         if not topic.strip():
             st.warning("कृपया पहले टॉपिक दर्ज करें!")
         elif not active_client:
-            st.error("🚨 कृपया ऊपर दिए गए बॉक्स में अपनी वैध Groq API Key दर्ज करें!")
+            st.error("🚨 API Key कॉन्फ़िगर नहीं है! कृपया Streamlit Cloud Settings में Secrets सेट करें।")
         else:
             with st.spinner("प्रो AI डायरेक्टर स्क्रिप्ट, विजुअल क्यूज और डायलॉग तैयार कर रहा है..."):
                 try:
