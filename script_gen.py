@@ -11,7 +11,7 @@ def render_script_page(groq_client):
     active_client = groq_client
     if not active_client or "यहाँ" in NEW_SECURE_API_KEY:
         try:
-            active_client = Groq(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)
+            active_client = Groq(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)
         except Exception:
             pass
 
