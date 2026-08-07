@@ -5,13 +5,13 @@ def render_script_page(groq_client):
     st.subheader("📜 AI Video & Story Script Writer (Pro Cinematic Level)")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए एक दम प्रोफेशनल और सिनेमैटिक स्क्रिप्ट तैयार कर सकते हैं:")
 
-    # आपकी फिक्स की गई Groq API Key यहाँ डायरेक्ट लोड हो जाएगी
-    DEFAULT_API_KEY = "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"
-    
+    # सुरक्षा के लिए ऐप के अंदर ही सुरक्षित इनपुट बॉक्स (यहाँ आप अपनी की डाल सकते हैं)
+    api_key_input = st.text_input("अपनी Groq API Key दर्ज करें:", type="password", placeholder="gsk_...")
+
     active_client = groq_client
-    if not active_client:
+    if api_key_input.strip():
         try:
-            active_client = Groq(api_key=DEFAULT_API_KEY)
+            active_client = Groq(api_key=api_key_input.strip())
         except Exception:
             pass
 
@@ -43,7 +43,7 @@ def render_script_page(groq_client):
         if not topic.strip():
             st.warning("कृपया पहले टॉपिक दर्ज करें!")
         elif not active_client:
-            st.error("🚨 API Key कनेक्ट करने में समस्या आई है!")
+            st.error("🚨 कृपया ऊपर दिए गए बॉक्स में अपनी वैध Groq API Key दर्ज करें!")
         else:
             with st.spinner("प्रो AI डायरेक्टर स्क्रिप्ट, विजुअल क्यूज और डायलॉग तैयार कर रहा है..."):
                 try:
