@@ -83,8 +83,7 @@ with head_col2:
 
 st.write("---")
 
-# Build nav list, respecting feature flags (hidden from non-admins if a tool
-# is turned off; admin still sees it, marked, so they can turn it back on)
+# Build nav list (Pricing tab removed as requested)
 pages = ["🏠 Dashboard"]
 for flag_key, label in FEATURE_KEYS.items():
     enabled = is_feature_enabled(supabase, flag_key)
@@ -92,7 +91,7 @@ for flag_key, label in FEATURE_KEYS.items():
         pages.append(label)
     elif admin_user:
         pages.append(f"🚧 {label}")
-pages.append("💳 Pricing")
+
 pages.append("💎 Upgrade to Pro")
 if admin_user:
     pages.append("🧾 Pending Payments")
@@ -203,16 +202,12 @@ elif st.session_state.current_page in ("🎙️ Voice Studio", "🚧 🎙️ Voi
 elif st.session_state.current_page in ("🎨 AI Image", "🚧 🎨 AI Image"):
     if st.session_state.current_page.startswith("🚧"):
         st.warning(get_config(supabase, "maintenance_message", "🚧 Ye feature abhi maintenance mode mein hai."))
-    render_image_page(supabase, st.session_state.user)
+    render_image_page()  # Fixed parameter mismatch error here
 
 elif st.session_state.current_page in ("🎬 Image to Video", "🚧 🎬 Image to Video"):
     if st.session_state.current_page.startswith("🚧"):
         st.warning(get_config(supabase, "maintenance_message", "🚧 Ye feature abhi maintenance mode mein hai."))
     render_video_page()
-
-elif st.session_state.current_page == "💳 Pricing":
-    st.subheader("💳 Pricing / Plans")
-    st.markdown(get_config(supabase, "pricing_rules", "फ़्री प्लान: रोजाना 10 मैसेज। प्रो प्लान: ₹199/महीना।"))
 
 elif st.session_state.current_page == "💎 Upgrade to Pro":
     st.subheader("💎 Upgrade to Pro")
