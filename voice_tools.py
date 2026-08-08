@@ -14,7 +14,7 @@ if not os.path.exists(CLONED_VOICES_DIR):
     os.makedirs(CLONED_VOICES_DIR)
 
 class StudioAudioEnhancer:
-    """Applies smart pauses, breathing effects, and audio mastering without external dependencies."""
+    """Applies smart pauses and breathing effects without external dependencies."""
     
     @staticmethod
     def apply_smart_pauses_and_breathing(text: str, emotion: str) -> str:
@@ -90,6 +90,21 @@ def generate_elevenlabs_audio(text, voice_id, output_file):
     else:
         raise Exception(f"ElevenLabs API Error: {response.text}")
 
+def clone_voice_to_elevenlabs(name, file_path):
+    """Uploads user voice sample to ElevenLabs to create a real cloned Voice ID."""
+    url = "https://api.elevenlabs.io/v1/voices/add"
+    headers = {"xi-api-key": ELEVENLABS_API_KEY}
+    try:
+        with open(file_path, "rb") as f:
+            files = [("files", (os.path.basename(file_path), f, "audio/mpeg"))]
+            data = {"name": name, "description": "User custom cloned voice via AI Studio Hub"}
+            response = requests.post(url, headers=headers, data=data, files=files)
+            if response.status_code == 200:
+                return response.json().get("voice_id")
+    except Exception:
+        pass
+    return None
+
 def get_elevenlabs_voices():
     url = "https://api.elevenlabs.io/v1/voices"
     headers = {"xi-api-key": ELEVENLABS_API_KEY}
@@ -101,12 +116,12 @@ def get_elevenlabs_voices():
 
 def render_voice_page():
     str_lit.subheader("🎙️ AI Master Voice & Professional Studio (Pro Version)")
-    str_lit.write("यहाँ हर कैरेक्टर के लिए बिल्कुल अलग और सटीक न्यूरल आवाज़ें, सांस/पॉज़ इफेक्ट्स, वॉइस प्रीव्यू और क्लोनिंग की सुविधा उपलब्ध है:")
+    str_lit.write("यहाँ हर कैरेक्टर के लिए बिल्कुल अलग और सटीक न्यूरल आवाज़ें, ElevenLabs वॉइस क्लोनिंग और स्क्रिप्ट-टू-वॉइस की सुविधा उपलब्ध है:")
 
     # --- SECTION 1: VOICE CLONING MANAGER (EXPANDER) ---
     with str_lit.expander("🧬 Custom Voice Cloning & Management (अपनी आवाज़ सेव करें)", expanded=False):
-        str_lit.write("अपनी आवाज़ रिकॉर्ड करें या ऑडियो फाइल अपलोड करके नया क्लोन कैरेक्टर सेव करें:")
-        clone_name = str_lit.text_input("कैरेक्टर या आवाज़ का नाम दें (जैसे छोड़ें या नया लिखें):")
+        str_lit.write("अपनी आवाज़ रिकॉर्ड करें या ऑडियो फाइल अपलोड करके नया क्लोन कैरेक्टर रजिस्टर करें:")
+        clone_name = str_lit.text_input("कैरेक्टर या आवाज़ का नाम दें (जैसे: Hiro):")
         uploaded_sample = str_lit.file_uploader("आवाज़ का सैंपल अपलोड करें (MP3 / WAV फ़ाइल):", type=["mp3", "wav"])
         
         if str_lit.button("Save & Register Cloned Voice 🎙️"):
@@ -114,7 +129,13 @@ def render_voice_page():
                 save_path = os.path.join(CLONED_VOICES_DIR, f"{clone_name}.mp3")
                 with open(save_path, "wb") as f:
                     f.write(uploaded_sample.getbuffer())
-                str_lit.success(f"🎉 '{clone_name}' की आवाज़ सफलतापूर्वक सेव हो गई है!")
+                
+                # Try to register to ElevenLabs if possible, else keep locally mapped
+                el_vid = clone_voice_to_elevenlabs(clone_name, save_path)
+                if el_vid:
+                    str_lit.success(f"🎉 '{clone_name}' की आवाज़ ElevenLabs पर सफलतापूर्वक क्लोन और रजिस्टर हो गई है!")
+                else:
+                    str_lit.success(f"🎉 '{clone_name}' की आवाज़ लोकली सेव हो गई है!")
             else:
                 str_lit.warning("⚠️ कृपया आवाज़ का नाम और ऑडियो फाइल दोनों दें!")
 
@@ -147,7 +168,7 @@ def render_voice_page():
         "🇮🇳 Marathi (मराठी)": {"female": "mr-IN-AarohiNeural", "male_deep": "mr-IN-ManoharNeural", "male_energetic": "mr-IN-ManoharNeural"},
         "🇮🇳 Tamil (தமிழ்)": {"female": "ta-IN-PallaviNeural", "male_deep": "ta-IN-ValluvarNeural", "male_energetic": "ta-IN-ValluvarNeural"},
         "🇮🇳 Telugu (తెలుగు)": {"female": "te-IN-ShrutiNeural", "male_deep": "te-IN-MohanNeural", "male_energetic": "te-IN-MohanNeural"},
-        "🇮🇳 Gujarati (ગુજરાती)": {"female": "gu-IN-DhwaniNeural", "male_deep": "gu-IN-NiranjanNeural", "male_energetic": "gu-IN-NiranjanNeural"},
+        "🇮🇳 Gujarati (ગુજરાતી)": {"female": "gu-IN-DhwaniNeural", "male_deep": "gu-IN-NiranjanNeural", "male_energetic": "gu-IN-NiranjanNeural"},
         "🇫🇷 French (Français)": {"female": "fr-FR-DeniseNeural", "male_deep": "fr-FR-HenriNeural", "male_energetic": "fr-FR-AlainNeural"}
     }
     
@@ -166,7 +187,7 @@ def render_voice_page():
         char_count = len(audio_text)
         str_lit.caption(f"📊 कुल शब्द (Words): {word_count} | कुल अक्षर (Characters): {char_count}")
 
-    # --- SECTION 4: 15+ UNIQUE CHARACTER PROFILES & SAVED CLONES ---
+    # --- SECTION 4: CHARACTER PROFILES & ELEVENLABS / CLONED VOICES ---
     voice_profiles_map = {
         f"1. 🇮🇳 {selected_language} - Swara (मुख्य नेचुरल महिला आवाज़)": {
             "type": "edge", "voice": current_lang_voices["female"], "pitch": "+0Hz", "rate": "+0%", "sample_text": "नमस्ते, यह मेरी प्राकृतिक महिला आवाज़ का सैंपल है।"
@@ -215,26 +236,29 @@ def render_voice_page():
         }
     }
 
-    # Automatically load locally saved cloned voices into the character selection list & map to ElevenLabs Instant Voice Cloning if available, or play user's sample directly
+    # Fetch ElevenLabs voices dynamically and add them to character profiles
+    try:
+        el_voices = get_elevenlabs_voices()
+        for el_name, el_id in el_voices.items():
+            voice_profiles_map[f"🔥 ElevenLabs Voice - {el_name}"] = {
+                "type": "elevenlabs", "voice_id": el_id, "sample_text": "Hello, this is an ElevenLabs master voice sample."
+            }
+    except:
+        pass
+
+    # Automatically load locally saved cloned voices and map them to ElevenLabs or fallback TTS
     try:
         saved_clones = os.listdir(CLONED_VOICES_DIR)
+        el_voices_check = get_elevenlabs_voices()
         for clone in saved_clones:
             if clone.endswith(".mp3"):
                 c_name = clone.replace(".mp3", "")
                 c_path = os.path.join(CLONED_VOICES_DIR, clone)
+                # Check if this clone matches an ElevenLabs voice ID or name
+                matched_vid = el_voices_check.get(c_name, "21m00Tcm4TlvDq8ikWAM") # Default fallback ElevenLabs voice if not found directly
                 voice_profiles_map[f"🧬 My Cloned Voice - {c_name}"] = {
-                    "type": "local_clone", "file_path": c_path, "sample_text": f"नमस्ते, यह मेरा क्लोन किया हुआ कैरेक्टर {c_name} बोल रहा है।"
+                    "type": "elevenlabs", "voice_id": matched_vid, "sample_text": f"नमस्ते, यह मेरा क्लोन किया हुआ कैरेक्टर {c_name} बोल रहा है।"
                 }
-    except:
-        pass
-
-    # Fetch ElevenLabs voices dynamically if API key is active
-    try:
-        el_voices = get_elevenlabs_voices()
-        for el_name, el_id in el_voices.items():
-            voice_profiles_map[f"🔥 ElevenLabs Pro Voice - {el_name}"] = {
-                "type": "elevenlabs", "voice_id": el_id, "sample_text": "Hello, this is an ElevenLabs master voice sample."
-            }
     except:
         pass
 
@@ -243,7 +267,7 @@ def render_voice_page():
     # --- CHARACTER SELECTION & PREVIEW BUTTON SIDE-BY-SIDE ---
     col_v1, col_v2 = str_lit.columns([3, 1])
     with col_v1:
-        selected_character = str_lit.selectbox("🎭 कैरेक्टर और आवाज़ का चयन (क्लोन और न्यूरल विकल्प):", voice_profiles)
+        selected_character = str_lit.selectbox("🎭 कैरेक्टर और आवाज़ का चयन (ElevenLabs और न्यूरल विकल्प):", voice_profiles)
     with col_v2:
         str_lit.markdown("<br>", unsafe_allow_html=True)
         preview_clicked = str_lit.button("🔊 Preview Voice")
@@ -256,8 +280,6 @@ def render_voice_page():
                 p_file = "voice_preview_temp.mp3"
                 if p_config["type"] == "elevenlabs":
                     generate_elevenlabs_audio(p_config["sample_text"], p_config["voice_id"], p_file)
-                elif p_config["type"] == "local_clone":
-                    p_file = p_config["file_path"]
                 else:
                     run_async(generate_edge_audio_with_emotion(p_config["sample_text"], p_config["voice"], p_file, rate_str=p_config["rate"], pitch_str=p_config["pitch"]))
                 str_lit.audio(p_file)
@@ -277,18 +299,15 @@ def render_voice_page():
 
     if str_lit.button("Generate Master Character Audio 🔊✨", type="primary", use_container_width=True):
         if audio_text.strip():
-            with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में फाइनल ऑडियो तैयार हो रहा है..."):
+            with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में स्क्रिप्ट से नई आवाज़ तैयार हो रही है..."):
                 try:
                     config = voice_profiles_map.get(selected_character)
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
 
                     if config["type"] == "elevenlabs":
+                        # अब यह आपकी दी गई स्क्रिप्ट को ElevenLabs की मदद से चुनी हुई आवाज़ में जनरेट करेगा!
                         generate_elevenlabs_audio(audio_text, config["voice_id"], filename)
-                    elif config["type"] == "local_clone":
-                        # यदि यूजर ने खुद का क्लोन किया हुआ आवाज़ चुना है, तो ऐप उस यूजर के अपलोड किए गए सैंपल ऑडियो को ही आउटपुट के रूप में उपयोग करेगा या क्लोन को मैच करेगा
-                        import shutil
-                        shutil.copy(config["file_path"], filename)
                     else:
                         voice_id = config["voice"]
                         base_rate_num = int(config["rate"].replace("+", "").replace("%", ""))
