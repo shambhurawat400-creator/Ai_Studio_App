@@ -1,45 +1,104 @@
 """
-Free Pro Storybook Studio (Pro Version)
-------------------------------------------
-Production-hardened rewrite:
-- Character Profile Manager for visual consistency across generations
-  (description auto-injected into every prompt + deterministic seed
-  derived from the character name)
-- Fixed buggy seed/key handling for saved images
-- Higher quality tiers with sane max-resolution caps
-- Image load verification with graceful fallback
-- use_container_width instead of deprecated use_column_width
+Free Pro Storybook Studio (Pro Version 2 — Nano Banana Edition)
+------------------------------------------------------------------
+- Primary image provider: Google Nano Banana (Gemini 2.5 Flash Image) —
+  ChatGPT/Midjourney-tier quality, free tier via Google AI Studio.
+- Automatic fallback to the free Pollinations model if Nano Banana is
+  unavailable (no key, quota exceeded, transient error) so the app
+  never breaks.
+- Real character consistency: the first image generated for a character
+  is saved as a reference image and passed back into Nano Banana on every
+  future generation for that character (true image-conditioned
+  consistency, not just a lucky seed).
 """
 
 import hashlib
 import logging
+import os
 import time
 import urllib.parse
 from datetime import datetime
+from io import BytesIO
 
 import requests
 import streamlit as st
+from PIL import Image
 
-MAX_DIMENSION = 2048  # safety cap so we never request an absurd/failing size
+logger = logging.getLogger(__name__)
+
+NANO_BANANA_MODEL = "gemini-2.5-flash-image"
+MAX_DIMENSION = 2048  # cap for the Pollinations fallback path
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Nano Banana (Gemini) client
+# ---------------------------------------------------------------------------
+
+@st.cache_resource(show_spinner=False)
+def get_gemini_client():
+    try:
+        from google import genai
+    except ImportError:
+        return None
+
+    api_key = None
+    try:
+        api_key = st.secrets.get("GEMINI_API_KEY")
+    except Exception:
+        pass
+    if not api_key:
+        api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return None
+
+    try:
+        return genai.Client(api_key=api_key)
+    except Exception as e:
+        logger.error("Failed to init Gemini client: %s", e)
+        return None
+
+
+def generate_with_nano_banana(client, prompt_text: str, aspect_ratio: str, reference_image_bytes):
+    """Returns image bytes on success, or None (caller falls back to Pollinations)."""
+    from google.genai import types
+
+    contents = [prompt_text]
+    if reference_image_bytes:
+        try:
+            contents.append(Image.open(BytesIO(reference_image_bytes)))
+        except Exception as e:
+            logger.warning("Could not decode reference image, skipping it: %s", e)
+
+    try:
+        config = types.GenerateContentConfig(image_config=types.ImageConfig(aspect_ratio=aspect_ratio))
+        response = client.models.generate_content(model=NANO_BANANA_MODEL, contents=contents, config=config)
+    except Exception as e:
+        logger.info("Aspect-ratio config not supported, retrying without it: %s", e)
+        try:
+            response = client.models.generate_content(model=NANO_BANANA_MODEL, contents=contents)
+        except Exception as e2:
+            logger.warning("Nano Banana generation failed: %s", e2)
+            return None
+
+    try:
+        for part in response.candidates[0].content.parts:
+            if getattr(part, "inline_data", None) is not None:
+                return part.inline_data.data
+    except Exception as e:
+        logger.warning("Could not parse Nano Banana response: %s", e)
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Pollinations fallback (free, no key needed)
 # ---------------------------------------------------------------------------
 
 def stable_seed_from_name(name: str, salt: int = 0) -> int:
-    """
-    Deterministic seed derived from a character name (+ optional salt for
-    slight variation between shots of the same character). Using a hash
-    instead of a random/microsecond value means every image generated for
-    this character starts from the same point, which is the closest a
-    prompt-only free model can get to visual consistency.
-    """
     digest = hashlib.sha256(f"{name}-{salt}".encode("utf-8")).hexdigest()
     return int(digest[:8], 16) % 1_000_000
 
 
-def build_image_url(prompt: str, neg_prompt: str, width: int, height: int, seed: int) -> str:
+def build_pollinations_url(prompt: str, neg_prompt: str, width: int, height: int, seed: int) -> str:
     encoded_prompt = urllib.parse.quote(prompt)
     encoded_neg = urllib.parse.quote(neg_prompt)
     return (
@@ -48,24 +107,23 @@ def build_image_url(prompt: str, neg_prompt: str, width: int, height: int, seed:
     )
 
 
-def fetch_image_bytes(url: str, timeout: float = 90.0, max_retries: int = 2) -> bytes | None:
-    """
-    Download the full image before rendering it. Pollinations.ai actually
-    generates the image on-demand (can take 15-60s, more for HD/Ultra),
-    so a quick HEAD check isn't enough — we wait for the real bytes.
-    """
+def fetch_image_bytes(url: str, timeout: float = 90.0, max_retries: int = 2):
     last_error = None
-    for attempt in range(1, max_retries + 1):
+    for _ in range(max_retries):
         try:
             resp = requests.get(url, timeout=timeout)
             if resp.status_code == 200 and resp.content and len(resp.content) > 1000:
                 return resp.content
-            last_error = f"status={resp.status_code}, size={len(resp.content) if resp.content else 0}"
+            last_error = f"status={resp.status_code}"
         except requests.RequestException as e:
             last_error = str(e)
         time.sleep(2)
-    logging.getLogger(__name__).warning("Image fetch failed after retries: %s", last_error)
+    logger.warning("Pollinations fetch failed: %s", last_error)
     return None
+
+
+def short_hash(data: bytes) -> str:
+    return hashlib.md5(data).hexdigest()[:10]
 
 
 # ---------------------------------------------------------------------------
@@ -74,31 +132,44 @@ def fetch_image_bytes(url: str, timeout: float = 90.0, max_retries: int = 2) -> 
 
 def render_image_page():
     st.subheader("🎨 Free Pro Storybook Studio")
-    st.write("बिना किसी खर्च के शानदार क्वालिटी, साफ़ चेहरों और **consistent characters** वाली इमेज बनाएं:")
+    st.write("Nano Banana (Google) की high quality और **consistent characters** के साथ इमेज बनाएं:")
+
+    gemini_client = get_gemini_client()
+    if gemini_client:
+        st.caption("✅ Nano Banana (high quality) active")
+    else:
+        st.warning("⚠️ GEMINI_API_KEY सेट नहीं है — free Pollinations model use होगा (lower quality). Behtar quality ke liye AI Studio se free key lo aur `GEMINI_API_KEY` secret set karo.")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
     if "saved_projects" not in st.session_state:
         st.session_state.saved_projects = []
     if "characters" not in st.session_state:
-        st.session_state.characters = []  # list of {"name": str, "description": str}
+        st.session_state.characters = []  # {"name","description","reference_image": bytes|None}
 
     # --- Character Profile Manager ---
     with st.expander("🎭 Character Profile Manager (Consistency के लिए)", expanded=False):
-        st.write("एक बार कैरेक्टर की पूरी बनावट (चेहरा, बाल, कपड़े, उम्र, खास पहचान) describe करो — हर image में वही description अपने-आप जुड़ेगा:")
+        st.write("एक बार कैरेक्टर describe करो — पहली image apne-aap reference ban jaayegi aur future images usi look ko follow karengi:")
         char_name = st.text_input("कैरेक्टर का नाम:", placeholder="जैसे: Grandma Kamla")
         char_desc = st.text_area(
-            "कैरेक्टर का पूरा विवरण (जितना detailed, उतना consistent result):",
-            placeholder="60 year old Indian woman, curly grey hair tied in a bun, wrinkled kind face, wearing a faded pink saree, round glasses, gentle smile",
+            "कैरेक्टर का पूरा विवरण:",
+            placeholder="60 year old Indian woman, curly grey hair, wrinkled kind face, faded pink saree, round glasses",
             height=90,
         )
+        char_ref_upload = st.file_uploader("(Optional) खुद की reference image अपलोड करो:", type=["png", "jpg", "jpeg"])
+
         if st.button("💾 Save Character"):
             if char_name.strip() and char_desc.strip():
                 existing_names = [c["name"] for c in st.session_state.characters]
                 if char_name.strip() in existing_names:
-                    st.warning("⚠️ इस नाम का कैरेक्टर पहले से मौजूद है — अलग नाम चुनें।")
+                    st.warning("⚠️ इस नाम का कैरेक्टर पहले से मौजूद है।")
                 else:
-                    st.session_state.characters.append({"name": char_name.strip(), "description": char_desc.strip()})
+                    ref_bytes = char_ref_upload.getvalue() if char_ref_upload else None
+                    st.session_state.characters.append({
+                        "name": char_name.strip(),
+                        "description": char_desc.strip(),
+                        "reference_image": ref_bytes,
+                    })
                     st.success(f"🎉 '{char_name}' कैरेक्टर सेव हो गया!")
             else:
                 st.warning("⚠️ कृपया नाम और विवरण दोनों भरें!")
@@ -106,7 +177,8 @@ def render_image_page():
         if st.session_state.characters:
             st.markdown("**सेव किए गए कैरेक्टर्स:**")
             for c in st.session_state.characters:
-                st.text(f"• {c['name']} — {c['description'][:70]}{'...' if len(c['description']) > 70 else ''}")
+                ref_status = "🖼️ reference set" if c.get("reference_image") else "— अभी तक reference नहीं (पहली image बनने पर auto-set होगी)"
+                st.text(f"• {c['name']} — {ref_status}")
 
     st.markdown("---")
 
@@ -120,7 +192,7 @@ def render_image_page():
     selected_character_name = st.selectbox("🎭 Character चुनें (Consistency के लिए):", character_names)
 
     neg_prompt = st.text_area(
-        "🚫 Negative Prompt (जो चीज़ें इमेज में नहीं चाहिए):",
+        "🚫 Negative Prompt (केवल Pollinations fallback के लिए इस्तेमाल होता है):",
         value="blurry, distorted face, low quality, bad anatomy, dark shadows, ugly, extra limbs, deformed hands",
     )
 
@@ -134,9 +206,9 @@ def render_image_page():
     ])
 
     col1, col2, col3 = st.columns(3)
-
     with col1:
         ratio_option = st.selectbox("📐 Aspect Ratio", ["Landscape (16:9)", "Portrait (9:16)", "Square (1:1)"])
+        aspect_ratio_str = {"Landscape (16:9)": "16:9", "Portrait (9:16)": "9:16", "Square (1:1)": "1:1"}[ratio_option]
         if "16:9" in ratio_option:
             base_width, base_height = 1280, 720
         elif "9:16" in ratio_option:
@@ -147,29 +219,28 @@ def render_image_page():
     with col2:
         quality_mode = st.selectbox("⚡ Quality Mode", ["Standard", "HD Quality", "Ultra HD Quality"])
         quality_multiplier = {"Standard": 1.0, "HD Quality": 1.3, "Ultra HD Quality": 1.6}[quality_mode]
-        width = min(int(base_width * quality_multiplier), MAX_DIMENSION)
-        height = min(int(base_height * quality_multiplier), MAX_DIMENSION)
+        fallback_width = min(int(base_width * quality_multiplier), MAX_DIMENSION)
+        fallback_height = min(int(base_height * quality_multiplier), MAX_DIMENSION)
 
     with col3:
         num_images = st.slider("🔢 Number of Images", 1, 4, 1)
 
-    if st.button("🚀 Generate Free Images Now", type="primary", use_container_width=True):
+    if st.button("🚀 Generate Images Now", type="primary", use_container_width=True):
         if not img_prompt.strip():
             st.warning("⚠️ कृपया पहले प्रॉम्प्ट बॉक्स में इमेज का विवरण (Prompt) दर्ज करें!")
             return
 
-        progress_text = "✨ AI फ्री मॉडल से बेहतरीन क्वालिटी तैयार कर रहा है..."
+        progress_text = "✨ High quality image तैयार हो रही है..."
         my_bar = st.progress(0, text=progress_text)
         for percent_complete in range(100):
             time.sleep(0.008)
             my_bar.progress(percent_complete + 1, text=f"{progress_text} ({percent_complete + 1}%)")
         my_bar.empty()
 
-        with st.spinner("🖼️ इमेज बन रही है... (Flux model ko poora detail generate karne mein 15-60 second lag sakte hain, please wait)"):
-            free_boost = "extremely detailed faces, sharp focus, clean lines, vibrant colors, masterpiece, 8k resolution"
-
+        with st.spinner("🖼️ इमेज बन रही है... (कुछ seconds से 1 मिनट तक लग सकते हैं)"):
+            free_boost = "extremely detailed faces, sharp focus, clean lines, vibrant colors, masterpiece, ultra high resolution, professional illustration"
             style_tags_map = {
-                "Indian Storybook Illustration (बेस्ट)": f"classic Indian storybook vector illustration, beautifully drawn characters and room background, {free_boost}",
+                "Indian Storybook Illustration (बेस्ट)": f"classic Indian storybook illustration, beautifully drawn characters and room background, {free_boost}",
                 "2D Animation / Cartoon": f"professional 2d animation cell, clean outlines, vibrant clear lighting, {free_boost}",
                 "Cinematic Story Frame": f"cinematic story frame, warm ambient lighting, highly detailed background, {free_boost}",
                 "Classic Oil Painting": f"classic oil painting on canvas, rich textured brushwork, masterpiece, {free_boost}",
@@ -177,67 +248,79 @@ def render_image_page():
             }
             current_style_tag = style_tags_map.get(style_option, free_boost)
 
-            # Inject character description for consistency, if selected
-            character_desc = ""
+            character = None
             if selected_character_name != "— कोई नहीं (No Character) —":
-                character_desc = next(
-                    (c["description"] for c in st.session_state.characters if c["name"] == selected_character_name),
-                    "",
-                )
+                character = next((c for c in st.session_state.characters if c["name"] == selected_character_name), None)
 
             clean_input = img_prompt.strip()
             prompt_parts = [clean_input]
-            if character_desc:
-                prompt_parts.append(f"character appearance: {character_desc}")
+            if character:
+                prompt_parts.append(f"the main character must match this description exactly: {character['description']}")
+                if character.get("reference_image"):
+                    prompt_parts.append("keep the character's face, hairstyle and outfit consistent with the provided reference image")
+            prompt_parts.append(f"aspect ratio {aspect_ratio_str}")
             prompt_parts.append(current_style_tag)
             final_prompt = ", ".join(prompt_parts)
-
             final_neg = neg_prompt.strip() if neg_prompt.strip() else "blurry, low quality"
 
-            generated = []  # list of {"url": str, "seed": int, "bytes": bytes|None}
-            for i in range(num_images):
-                if character_desc:
-                    seed_val = stable_seed_from_name(selected_character_name, salt=i)
-                else:
-                    seed_val = datetime.now().microsecond + i
+            generated = []  # {"bytes": bytes|None, "provider": str|None, "url": str|None}
 
-                url = build_image_url(final_prompt, final_neg, width, height, seed_val)
-                img_bytes = fetch_image_bytes(url)
-                generated.append({"url": url, "seed": seed_val, "bytes": img_bytes})
+            for i in range(num_images):
+                img_bytes = None
+                provider = None
+                url = None
+
+                if gemini_client:
+                    ref_bytes = character.get("reference_image") if character else None
+                    img_bytes = generate_with_nano_banana(gemini_client, final_prompt, aspect_ratio_str, ref_bytes)
+                    if img_bytes:
+                        provider = "Nano Banana"
+                        if character and not character.get("reference_image"):
+                            character["reference_image"] = img_bytes
+
+                if not img_bytes:
+                    seed_val = stable_seed_from_name(selected_character_name, salt=i) if character else datetime.now().microsecond + i
+                    url = build_pollinations_url(final_prompt, final_neg, fallback_width, fallback_height, seed_val)
+                    img_bytes = fetch_image_bytes(url)
+                    provider = "Pollinations (fallback)" if img_bytes else None
+
+                generated.append({"bytes": img_bytes, "provider": provider, "url": url})
 
             success_count = sum(1 for g in generated if g["bytes"] is not None)
             if success_count == 0:
-                st.error("🚨 कोई भी इमेज generate नहीं हो पाई — pollinations.ai server शायद busy है। कुछ सेकंड बाद फिर कोशिश करें।")
+                st.error("🚨 कोई भी इमेज generate नहीं हो पाई। API key/quota check करो या कुछ देर बाद फिर कोशिश करो।")
             else:
-                st.success(f"✨ शानदार क्वालिटी की {success_count}/{num_images} इमेज तैयार हैं!")
+                st.success(f"✨ {success_count}/{num_images} इमेज तैयार हैं!")
 
             cols = st.columns(min(num_images, 2))
             for idx, item in enumerate(generated):
-                url, seed_val, img_bytes = item["url"], item["seed"], item["bytes"]
+                img_bytes, provider, url = item["bytes"], item["provider"], item["url"]
                 with cols[idx % len(cols)]:
                     if img_bytes:
-                        st.image(img_bytes, caption=f"Style: {style_option} | #{idx + 1}", use_container_width=True)
+                        caption = f"Style: {style_option} | #{idx + 1}"
+                        if provider:
+                            caption += f" | {provider}"
+                        st.image(img_bytes, caption=caption, use_container_width=True)
+                        h = short_hash(img_bytes)
                         st.download_button(
                             label=f"📥 Download Image {idx + 1}",
                             data=img_bytes,
-                            file_name=f"storybook_image_{idx + 1}_{seed_val}.jpg",
-                            mime="image/jpeg",
-                            key=f"download_{seed_val}_{idx}",
+                            file_name=f"storybook_image_{idx + 1}.png",
+                            mime="image/png",
+                            key=f"download_{idx}_{h}",
                         )
-                    else:
-                        st.warning(f"⚠️ Image #{idx + 1} generate नहीं हो पाई (timeout/server busy). Link try karo:")
-                        st.markdown(f"[🔗 Open Image {idx + 1} Directly]({url})")
-
-                    if st.button(f"💾 Save Project #{idx + 1}", key=f"save_{seed_val}_{idx}"):
-                        project_data = {
-                            "prompt": img_prompt,
-                            "character": selected_character_name,
-                            "style": style_option,
-                            "url": url,
-                        }
-                        if project_data not in st.session_state.saved_projects:
-                            st.session_state.saved_projects.append(project_data)
+                        if st.button(f"💾 Save Project #{idx + 1}", key=f"save_{idx}_{h}"):
+                            st.session_state.saved_projects.append({
+                                "prompt": img_prompt,
+                                "character": selected_character_name,
+                                "style": style_option,
+                                "image": img_bytes,
+                            })
                             st.success("📁 प्रोजेक्ट सफलतापूर्वक सेव हो गया!")
+                    else:
+                        st.warning(f"⚠️ Image #{idx + 1} generate नहीं हो पाई।")
+                        if url:
+                            st.markdown(f"[🔗 Direct link try karo]({url})")
 
             if success_count > 0:
                 first_ok = next(g for g in generated if g["bytes"] is not None)
@@ -245,7 +328,7 @@ def render_image_page():
                     "prompt": img_prompt,
                     "character": selected_character_name,
                     "style": style_option,
-                    "url": first_ok["url"],
+                    "image": first_ok["bytes"],
                 })
 
     st.markdown("---")
@@ -255,10 +338,8 @@ def render_image_page():
         st.subheader("आपके सेव किए गए प्रोजेक्ट्स")
         if st.session_state.saved_projects:
             for p_idx, proj in enumerate(st.session_state.saved_projects):
-                char_label = proj.get("character", "—")
-                st.write(f"**{p_idx + 1}. Style:** {proj['style']} | **Character:** {char_label} | **Prompt:** {proj['prompt']}")
-                st.image(proj["url"], width=300)
-                st.markdown(f"[🔗 Direct Link]({proj['url']})")
+                st.write(f"**{p_idx + 1}. Style:** {proj['style']} | **Character:** {proj.get('character', '—')} | **Prompt:** {proj['prompt']}")
+                st.image(proj["image"], width=300)
                 st.write("---")
         else:
             st.info("कोई प्रोजेक्ट सेव नहीं है।")
@@ -267,9 +348,8 @@ def render_image_page():
         st.subheader("पिछली जनरेट की गई इमेजेस (History)")
         if st.session_state.image_history:
             for h_idx, hist in enumerate(st.session_state.image_history[:5]):
-                char_label = hist.get("character", "—")
-                st.write(f"**Style:** {hist['style']} | **Character:** {char_label} | **Prompt:** {hist['prompt']}")
-                st.image(hist["url"], width=250)
+                st.write(f"**Style:** {hist['style']} | **Character:** {hist.get('character', '—')} | **Prompt:** {hist['prompt']}")
+                st.image(hist["image"], width=250)
                 st.write("---")
         else:
             st.info("इतिहास (History) खाली है।")
