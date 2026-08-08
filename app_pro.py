@@ -15,6 +15,7 @@ from video_gen import render_video_page
 from voice_tools import render_voice_page
 from auth_pro import get_supabase_client, restore_session, render_auth_ui, render_account_menu
 from settings_pro import render_settings_page
+from admin_assistant_pro import is_admin, get_config, is_feature_enabled, render_admin_assistant_page, FEATURE_KEYS
 
 st.set_page_config(
     page_title="AI Studio Hub",
@@ -64,7 +65,10 @@ def get_groq_client():
 if "current_page" not in st.session_state:
     st.session_state.current_page = "🏠 Dashboard"
 if "pricing_rules" not in st.session_state:
-    st.session_state.pricing_rules = "फ़्री प्लान: रोजाना 10 मैसेज। प्रो प्लान: ₹199/महीना।"
+    st.session_state.pricing_rules = get_config(supabase, "pricing_rules", "फ़्री प्लान: रोजाना 10 मैसेज। प्रो प्लान: ₹199/महीना।")
+
+admin_user = is_admin(st.session_state.get("user"))
+app_title = get_config(supabase, "app_title", "🤖 AI Studio Hub")
 
 # ---------------------------------------------------------------------------
 # Header: title + account menu (email + logout)
@@ -72,13 +76,24 @@ if "pricing_rules" not in st.session_state:
 
 head_col1, head_col2 = st.columns([3, 2])
 with head_col1:
-    st.title("🤖 AI Studio Hub")
+    st.title(app_title)
 with head_col2:
     render_account_menu(supabase)
 
 st.write("---")
 
-pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎙️ Voice Studio", "🎨 AI Image", "🎬 Image to Video", "⚙️ Settings"]
+# Build nav list, respecting feature flags (hidden from non-admins if a tool
+# is turned off; admin still sees it, marked, so they can turn it back on)
+pages = ["🏠 Dashboard"]
+for flag_key, label in FEATURE_KEYS.items():
+    enabled = is_feature_enabled(supabase, flag_key)
+    if enabled:
+        pages.append(label)
+    elif admin_user:
+        pages.append(f"🚧 {label}")
+pages.append("⚙️ Settings")
+if admin_user:
+    pages.append("🛠️ Admin Assistant")
 
 nav_cols = st.columns(len(pages))
 for i, page in enumerate(pages):
@@ -94,8 +109,8 @@ st.write("---")
 # ---------------------------------------------------------------------------
 
 if st.session_state.current_page == "🏠 Dashboard":
-    st.subheader("👋 Welcome to AI Studio Dashboard!")
-    st.info("💡 यहाँ से आप कोई भी AI टूल डायरेक्ट ओपन कर सकते हैं।")
+    st.subheader(get_config(supabase, "dashboard_welcome", "👋 Welcome to AI Studio Dashboard!"))
+    st.info(get_config(supabase, "dashboard_info_banner", "💡 यहाँ से आप कोई भी AI टूल डायरेक्ट ओपन कर सकते हैं।"))
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -125,7 +140,9 @@ if st.session_state.current_page == "🏠 Dashboard":
             st.session_state.current_page = "⚙️ Settings"
             st.rerun()
 
-elif st.session_state.current_page == "💬 AI Chatbot":
+elif st.session_state.current_page in ("💬 AI Chatbot", "🚧 💬 AI Chatbot"):
+    if st.session_state.current_page.startswith("🚧"):
+        st.warning(get_config(supabase, "maintenance_message", "🚧 Ye feature abhi maintenance mode mein hai."))
     st.subheader("💬 AI Chat Assistant & Admin Helper")
     st.write("यहाँ आप अपने AI असिस्टेंट से सामान्य सवाल पूछ सकते हैं या भविष्य में ऐप में बदलाव/कोडिंग से जुड़े निर्देश ले सकते हैं।")
 
@@ -161,20 +178,31 @@ elif st.session_state.current_page == "💬 AI Chatbot":
             except Exception as e:
                 st.error(f"Chat Error: {str(e)}")
 
-elif st.session_state.current_page == "📜 AI Script":
+elif st.session_state.current_page in ("📜 AI Script", "🚧 📜 AI Script"):
+    if st.session_state.current_page.startswith("🚧"):
+        st.warning(get_config(supabase, "maintenance_message", "🚧 Ye feature abhi maintenance mode mein hai."))
     try:
         render_script_page(get_groq_client())
     except Exception as e:
         st.error(f"Script Page Error: {str(e)}")
 
-elif st.session_state.current_page == "🎙️ Voice Studio":
+elif st.session_state.current_page in ("🎙️ Voice Studio", "🚧 🎙️ Voice Studio"):
+    if st.session_state.current_page.startswith("🚧"):
+        st.warning(get_config(supabase, "maintenance_message", "🚧 Ye feature abhi maintenance mode mein hai."))
     render_voice_page()
 
-elif st.session_state.current_page == "🎨 AI Image":
+elif st.session_state.current_page in ("🎨 AI Image", "🚧 🎨 AI Image"):
+    if st.session_state.current_page.startswith("🚧"):
+        st.warning(get_config(supabase, "maintenance_message", "🚧 Ye feature abhi maintenance mode mein hai."))
     render_image_page()
 
-elif st.session_state.current_page == "🎬 Image to Video":
+elif st.session_state.current_page in ("🎬 Image to Video", "🚧 🎬 Image to Video"):
+    if st.session_state.current_page.startswith("🚧"):
+        st.warning(get_config(supabase, "maintenance_message", "🚧 Ye feature abhi maintenance mode mein hai."))
     render_video_page()
 
 elif st.session_state.current_page == "⚙️ Settings":
     render_settings_page(supabase)
+
+elif st.session_state.current_page == "🛠️ Admin Assistant" and admin_user:
+    render_admin_assistant_page(supabase, get_groq_client())
