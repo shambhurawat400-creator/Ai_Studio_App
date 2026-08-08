@@ -12,6 +12,7 @@ Production-hardened rewrite:
 """
 
 import hashlib
+import logging
 import time
 import urllib.parse
 from datetime import datetime
@@ -47,14 +48,24 @@ def build_image_url(prompt: str, neg_prompt: str, width: int, height: int, seed:
     )
 
 
-def image_url_is_reachable(url: str, timeout: float = 8.0) -> bool:
-    try:
-        resp = requests.head(url, timeout=timeout, allow_redirects=True)
-        if resp.status_code == 405:  # some servers don't support HEAD; fall back to GET
-            resp = requests.get(url, timeout=timeout, stream=True)
-        return resp.status_code == 200
-    except requests.RequestException:
-        return False
+def fetch_image_bytes(url: str, timeout: float = 90.0, max_retries: int = 2) -> bytes | None:
+    """
+    Download the full image before rendering it. Pollinations.ai actually
+    generates the image on-demand (can take 15-60s, more for HD/Ultra),
+    so a quick HEAD check isn't enough — we wait for the real bytes.
+    """
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            resp = requests.get(url, timeout=timeout)
+            if resp.status_code == 200 and resp.content and len(resp.content) > 1000:
+                return resp.content
+            last_error = f"status={resp.status_code}, size={len(resp.content) if resp.content else 0}"
+        except requests.RequestException as e:
+            last_error = str(e)
+        time.sleep(2)
+    logging.getLogger(__name__).warning("Image fetch failed after retries: %s", last_error)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +165,7 @@ def render_image_page():
             my_bar.progress(percent_complete + 1, text=f"{progress_text} ({percent_complete + 1}%)")
         my_bar.empty()
 
-        with st.spinner("🖼️ इमेज लोड हो रही है..."):
+        with st.spinner("🖼️ इमेज बन रही है... (Flux model ko poora detail generate karne mein 15-60 second lag sakte hain, please wait)"):
             free_boost = "extremely detailed faces, sharp focus, clean lines, vibrant colors, masterpiece, 8k resolution"
 
             style_tags_map = {
@@ -183,30 +194,39 @@ def render_image_page():
 
             final_neg = neg_prompt.strip() if neg_prompt.strip() else "blurry, low quality"
 
-            generated = []  # list of {"url": str, "seed": int}
+            generated = []  # list of {"url": str, "seed": int, "bytes": bytes|None}
             for i in range(num_images):
                 if character_desc:
-                    # Deterministic seed tied to the character name -> consistent look
-                    # across every image generated for this character, with a small
-                    # per-shot offset so multiple images aren't pixel-identical.
                     seed_val = stable_seed_from_name(selected_character_name, salt=i)
                 else:
                     seed_val = datetime.now().microsecond + i
 
                 url = build_image_url(final_prompt, final_neg, width, height, seed_val)
-                generated.append({"url": url, "seed": seed_val})
+                img_bytes = fetch_image_bytes(url)
+                generated.append({"url": url, "seed": seed_val, "bytes": img_bytes})
 
-            st.success(f"✨ शानदार क्वालिटी की {num_images} इमेज तैयार हैं!")
+            success_count = sum(1 for g in generated if g["bytes"] is not None)
+            if success_count == 0:
+                st.error("🚨 कोई भी इमेज generate नहीं हो पाई — pollinations.ai server शायद busy है। कुछ सेकंड बाद फिर कोशिश करें।")
+            else:
+                st.success(f"✨ शानदार क्वालिटी की {success_count}/{num_images} इमेज तैयार हैं!")
 
             cols = st.columns(min(num_images, 2))
             for idx, item in enumerate(generated):
-                url, seed_val = item["url"], item["seed"]
+                url, seed_val, img_bytes = item["url"], item["seed"], item["bytes"]
                 with cols[idx % len(cols)]:
-                    if image_url_is_reachable(url):
-                        st.image(url, caption=f"Style: {style_option} | #{idx + 1}", use_container_width=True)
+                    if img_bytes:
+                        st.image(img_bytes, caption=f"Style: {style_option} | #{idx + 1}", use_container_width=True)
+                        st.download_button(
+                            label=f"📥 Download Image {idx + 1}",
+                            data=img_bytes,
+                            file_name=f"storybook_image_{idx + 1}_{seed_val}.jpg",
+                            mime="image/jpeg",
+                            key=f"download_{seed_val}_{idx}",
+                        )
                     else:
-                        st.warning(f"⚠️ Image #{idx + 1} load नहीं हो पाई (server busy/timeout). Link try karo:")
-                    st.markdown(f"[📥 Download / Open Image {idx + 1}]({url})")
+                        st.warning(f"⚠️ Image #{idx + 1} generate नहीं हो पाई (timeout/server busy). Link try karo:")
+                        st.markdown(f"[🔗 Open Image {idx + 1} Directly]({url})")
 
                     if st.button(f"💾 Save Project #{idx + 1}", key=f"save_{seed_val}_{idx}"):
                         project_data = {
@@ -219,12 +239,14 @@ def render_image_page():
                             st.session_state.saved_projects.append(project_data)
                             st.success("📁 प्रोजेक्ट सफलतापूर्वक सेव हो गया!")
 
-            st.session_state.image_history.insert(0, {
-                "prompt": img_prompt,
-                "character": selected_character_name,
-                "style": style_option,
-                "url": generated[0]["url"],
-            })
+            if success_count > 0:
+                first_ok = next(g for g in generated if g["bytes"] is not None)
+                st.session_state.image_history.insert(0, {
+                    "prompt": img_prompt,
+                    "character": selected_character_name,
+                    "style": style_option,
+                    "url": first_ok["url"],
+                })
 
     st.markdown("---")
     tab1, tab2 = st.tabs(["📂 Saved Projects", "📜 Generation History"])
