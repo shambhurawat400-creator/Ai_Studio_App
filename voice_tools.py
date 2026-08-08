@@ -14,36 +14,11 @@ if not os.path.exists(CLONED_VOICES_DIR):
     os.makedirs(CLONED_VOICES_DIR)
 
 class StudioAudioEnhancer:
-    """Applies smart pauses and breathing effects without external dependencies."""
+    """Applies clean text formatting without breathing or interruption effects."""
     
     @staticmethod
     def apply_smart_pauses_and_breathing(text: str, emotion: str) -> str:
-        if "फुसफुसाहट" in emotion or "Whisper" in emotion:
-            text = f"shh... (सांस लेते हुए) {text}... धीरे से..."
-        elif "हंसते हुए" in emotion or "Laughing" in emotion:
-            text = f"हा हा... {text}..."
-            
-        sentences = re.split(r'(?<=[.!?])\s+', text)
-        processed_sentences = []
-        
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-            
-            if len(sentence.split()) > 5:
-                sentence = f"... (सांस लें) ... {sentence}"
-            
-            if "डरावना" in emotion or "गंभीर" in emotion:
-                sentence = sentence.replace(",", "...... ").replace("!", "...... ").replace("?", "......... ")
-            elif "भावुक" in emotion:
-                sentence = sentence.replace(",", ".... ").replace("!", ".... ").replace("?", "...... ")
-            else:
-                sentence = sentence.replace(",", "... ").replace("!", "... ").replace("?", "...... ")
-            
-            processed_sentences.append(sentence)
-            
-        return " ... ".join(processed_sentences)
+        return text
 
 def run_async(coro):
     try:
@@ -91,7 +66,6 @@ def generate_elevenlabs_audio(text, voice_id, output_file):
         raise Exception(f"ElevenLabs API Error: {response.text}")
 
 def clone_voice_to_elevenlabs(name, file_path):
-    """Uploads user voice sample to ElevenLabs to create a real cloned Voice ID."""
     url = "https://api.elevenlabs.io/v1/voices/add"
     headers = {"xi-api-key": ELEVENLABS_API_KEY}
     try:
@@ -106,14 +80,20 @@ def clone_voice_to_elevenlabs(name, file_path):
     return None
 
 def get_elevenlabs_voices():
-    # डिफ़ॉल्ट प्रो ElevenLabs वॉइस IDs ताकि API फेच फेल होने पर भी कैरेक्टर्स हमेशा उपलब्ध रहें
+    # प्रो लेवल कैरेक्टर्स: महिला, पुरुष, दादाजी, दादी/अम्मा, बच्चा, विलेन और भूतिया आवाज़ों के लिए विस्तृत IDs
     fallback_voices = {
-        "Rachel (Professional Female)": "21m00Tcm4TlvDq8ikWAM",
-        "Dom (Deep Calm Male)": "AZnzlk1XvdvUeBnXmlld",
-        "Bella (Soft Narrative Female)": "EXAVITQu4vr4xnSDxMaL",
-        "Antoni (Warm Cinematic Male)": "ErXwobaYiN019PkySvjV",
-        "Elli (Expressive Young Female)": "MF3mGyEYCl7XYWbV9V6O",
-        "Josh (Deep Energetic Male)": "TxGEqnHWrfWFTfGW9XjX"
+        " Rachel (Professional Female - मुख्य महिला)": "21m00Tcm4TlvDq8ikWAM",
+        " Dom (Deep Calm Male - गंभीर पुरुष)": "AZnzlk1XvdvUeBnXmlld",
+        " Bella (Soft Narrative Female - कोमल कहानीकार महिला)": "EXAVITQu4vr4xnSDxMaL",
+        " Antoni (Warm Cinematic Male - सिनेमैटिक पुरुष)": "ErXwobaYiN019PkySvjV",
+        " Elli (Expressive Young Female - युवा लड़की)": "MF3mGyEYCl7XYWbV9V6O",
+        " Josh (Deep Energetic Male - एनर्जेटिक पुरुष)": "TxGEqnHWrfWFTfGW9XjX",
+        " 👴 Grandfather / Old Man (बुजुर्ग दादाजी)": "VR6AewLTigWG4xSOukaG",
+        " 👵 Grandmother / Dadi Amma (बूढ़ी दादी / अम्मा)": "jsCqWAovK2LkecY7zXl4",
+        " 👦 Kid / Young Boy (छोटा बच्चा / लड़का)": "GBv7mTt0atIp3Br8iCZE",
+        " 👧 Cute Little Girl (प्यारी बच्ची)": "ThT5KcBeYPX3keUQqHPh",
+        " 🧛 Evil Villain / Monster (खतरनाक खलनायक)": "ZQe5CZNOzWyzPSCn5a3c",
+        " 👻 Horror Ghost / Dark Spirit (भूतिया भारी आवाज़)": "ODq5zmih8GrVes37Dizd"
     }
     url = "https://api.elevenlabs.io/v1/voices"
     headers = {"xi-api-key": ELEVENLABS_API_KEY}
@@ -122,14 +102,16 @@ def get_elevenlabs_voices():
         if response.status_code == 200:
             voices = response.json().get("voices", [])
             if voices:
-                return {v["name"]: v["voice_id"] for v in voices}
+                api_voices = {v["name"]: v["voice_id"] for v in voices}
+                # API के साथ-साथ हमारे नए जोड़े गए स्पेशल कैरेक्टर्स को भी मिलाना ताकि लिस्ट हमेशा पूरी रहे
+                fallback_voices.update(api_voices)
     except Exception:
         pass
     return fallback_voices
 
 def render_voice_page():
     str_lit.subheader("🎙️ AI Master Voice & Professional Studio (Pro Version)")
-    str_lit.write("यहाँ हर कैरेक्टर के लिए बिल्कुल अलग और सटीक न्यूरल आवाज़ें, सांस/पॉज़ इफेक्ट्स, वॉइस प्रीव्यू और क्लोनिंग की सुविधा उपलब्ध है:")
+    str_lit.write("यहाँ हर कैरेक्टर के लिए बिल्कुल अलग और सटीक न्यूरल आवाज़ें, वॉइस प्रीव्यू और क्लोनिंग की सुविधा उपलब्ध है:")
 
     # --- ENGINE SELECTION (Free vs ElevenLabs) ---
     voice_engine_choice = str_lit.radio(
@@ -258,16 +240,17 @@ def render_voice_page():
             }
         }
     else:
-        # ElevenLabs & Cloned Voices
+        # ElevenLabs & Custom Cloned Voices Integration (अब इसमें दादाजी, दादी, बच्चे, विलेन आदि के विकल्प शामिल हैं)
         try:
             el_voices = get_elevenlabs_voices()
             for el_name, el_id in el_voices.items():
                 voice_profiles_map[f"🔥 ElevenLabs Voice - {el_name}"] = {
-                    "type": "elevenlabs", "voice_id": el_id, "sample_text": "Hello, this is an ElevenLabs master voice sample."
+                    "type": "elevenlabs", "voice_id": el_id, "sample_text": "Hello, this is a professional character voice sample."
                 }
         except:
             pass
 
+        # आपके सेव किए गए कस्टम क्लोन कैरेक्टर्स को लिस्ट में जोड़ना
         try:
             saved_clones = os.listdir(CLONED_VOICES_DIR)
             el_voices_check = get_elevenlabs_voices()
@@ -334,7 +317,6 @@ def render_voice_page():
 
                     if config["type"] == "elevenlabs":
                         try:
-                            # अब यह ElevenLabs की चुनी हुई वॉइस आईडी से आपकी स्क्रिप्ट को टेक्स्ट-टू-स्पीच में परफेक्ट जनरेट करेगा
                             generate_elevenlabs_audio(audio_text, config["voice_id"], filename)
                         except Exception:
                             run_async(generate_edge_audio_with_emotion(audio_text, current_lang_voices["male_deep"], filename, emotion=audio_emotion))
