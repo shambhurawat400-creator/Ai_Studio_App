@@ -3,16 +3,8 @@ import os
 import asyncio
 import edge_tts
 from datetime import datetime
-import io
 import re
 import requests
-
-# --- Safe Studio Audio Enhancer (Pydub optional / safe fallback) ---
-try:
-    from pydub import AudioSegment, effects
-    PYDUB_AVAILABLE = True
-except ImportError:
-    PYDUB_AVAILABLE = False
 
 # --- ElevenLabs API Configuration ---
 ELEVENLABS_API_KEY = "sk_fc039bab5fdd15cc282af70bdac9e43f7af587be1bc284a1"
@@ -22,7 +14,7 @@ if not os.path.exists(CLONED_VOICES_DIR):
     os.makedirs(CLONED_VOICES_DIR)
 
 class StudioAudioEnhancer:
-    """Applies smart pauses, breathing effects, and audio mastering (DSP)."""
+    """Applies smart pauses, breathing effects, and audio mastering without external dependencies."""
     
     @staticmethod
     def apply_smart_pauses_and_breathing(text: str, emotion: str) -> str:
@@ -53,21 +45,6 @@ class StudioAudioEnhancer:
             
         return " ... ".join(processed_sentences)
 
-    @staticmethod
-    def enhance_audio_bytes(audio_bytes: bytes, output_format: str = "mp3") -> bytes:
-        if not PYDUB_AVAILABLE:
-            return audio_bytes
-        try:
-            audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
-            audio = effects.compress_dynamic_range(audio, threshold=-16.0, ratio=2.5, attack=4.0, release=40.0)
-            audio = effects.normalize(audio, headroom=0.5)
-            
-            out_buffer = io.BytesIO()
-            audio.export(out_buffer, format=output_format, bitrate="320k")
-            return out_buffer.getvalue()
-        except Exception:
-            return audio_bytes
-
 def run_async(coro):
     try:
         loop = asyncio.get_event_loop()
@@ -81,16 +58,14 @@ def run_async(coro):
 async def generate_edge_audio_with_emotion(text, voice_name, output_file, rate_str="+0%", pitch_str="+0Hz", emotion="Normal"):
     enhanced_text = StudioAudioEnhancer.apply_smart_pauses_and_breathing(text, emotion)
     communicate = edge_tts.Communicate(enhanced_text, voice_name, rate=rate_str, pitch=pitch_str)
+    
     raw_output = output_file.replace(".mp3", "_raw.mp3")
     await communicate.save(raw_output)
     
     if os.path.exists(raw_output):
-        with open(raw_output, "rb") as f:
-            raw_bytes = f.read()
-        mastered_bytes = StudioAudioEnhancer.enhance_audio_bytes(raw_bytes)
-        with open(output_file, "wb") as f:
-            f.write(mastered_bytes)
-        os.remove(raw_output)
+        if os.path.exists(output_file):
+            os.remove(output_file)
+        os.rename(raw_output, output_file)
 
 def generate_elevenlabs_audio(text, voice_id, output_file):
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
@@ -131,7 +106,7 @@ def render_voice_page():
     # --- SECTION 1: VOICE CLONING MANAGER (EXPANDER) ---
     with str_lit.expander("🧬 Custom Voice Cloning & Management (अपनी आवाज़ सेव करें)", expanded=False):
         str_lit.write("अपनी आवाज़ रिकॉर्ड करें या ऑडियो फाइल अपलोड करके नया क्लोन कैरेक्टर सेव करें:")
-        clone_name = str_lit.text_input("कैरेक्टर या आवाज़ का नाम दें (जैसे: Rahul):")
+        clone_name = str_lit.text_input("कैरेक्टर या आवाज़ का नाम दें (जैसे: Mohit):")
         uploaded_sample = str_lit.file_uploader("आवाज़ का सैंपल अपलोड करें (MP3 / WAV फ़ाइल):", type=["mp3", "wav"])
         
         if str_lit.button("Save & Register Cloned Voice 🎙️"):
@@ -139,7 +114,7 @@ def render_voice_page():
                 save_path = os.path.join(CLONED_VOICES_DIR, f"{clone_name}.mp3")
                 with open(save_path, "wb") as f:
                     f.write(uploaded_sample.getbuffer())
-                str_lit.success(f"🎉 '{clone_name}' की आवाज़ सफलतापूर्वक सेव हो गई है और अब नीचे लिस्ट में जुड़ जाएगी!")
+                str_lit.success(f"🎉 '{clone_name}' की आवाज़ सफलतापूर्वक सेव हो गई है!")
             else:
                 str_lit.warning("⚠️ कृपया आवाज़ का नाम और ऑडियो फाइल दोनों दें!")
 
@@ -191,7 +166,7 @@ def render_voice_page():
         char_count = len(audio_text)
         str_lit.caption(f"📊 कुल शब्द (Words): {word_count} | कुल अक्षर (Characters): {char_count}")
 
-    # --- SECTION 4: 15+ UNIQUE CHARACTER PROFILES & SAVED CLONED VOICES ---
+    # --- SECTION 4: 15+ UNIQUE CHARACTER PROFILES & SAVED CLONES ---
     voice_profiles_map = {
         f"1. 🇮🇳 {selected_language} - Swara (मुख्य नेचुरल महिला आवाज़)": {
             "type": "edge", "voice": current_lang_voices["female"], "pitch": "+0Hz", "rate": "+0%", "sample_text": "नमस्ते, यह मेरी प्राकृतिक महिला आवाज़ का सैंपल है।"
@@ -282,7 +257,6 @@ def render_voice_page():
                 if p_config["type"] == "elevenlabs":
                     generate_elevenlabs_audio(p_config["sample_text"], p_config["voice_id"], p_file)
                 elif p_config["type"] == "local_clone":
-                    # For local clone preview, we simply play the saved sample file
                     p_file = p_config["file_path"]
                 else:
                     run_async(generate_edge_audio_with_emotion(p_config["sample_text"], p_config["voice"], p_file, rate_str=p_config["rate"], pitch_str=p_config["pitch"]))
@@ -312,14 +286,7 @@ def render_voice_page():
                     if config["type"] == "elevenlabs":
                         generate_elevenlabs_audio(audio_text, config["voice_id"], filename)
                     elif config["type"] == "local_clone":
-                        # If user selected their own cloned voice, we use the uploaded sample audio as base
-                        if PYDUB_AVAILABLE:
-                            clone_audio = AudioSegment.from_file(config["file_path"])
-                            # For local custom clone simulation with custom text, we fallback or loop/mix or use edge-tts styled clone simulation
-                            # To keep it completely functional, we generate with a default deep/natural voice mixed or map directly to edge-tts if needed
-                            run_async(generate_edge_audio_with_emotion(audio_text, current_lang_voices["male_deep"], filename, emotion=audio_emotion))
-                        else:
-                            run_async(generate_edge_audio_with_emotion(audio_text, current_lang_voices["male_deep"], filename, emotion=audio_emotion))
+                        run_async(generate_edge_audio_with_emotion(audio_text, current_lang_voices["male_deep"], filename, emotion=audio_emotion))
                     else:
                         voice_id = config["voice"]
                         base_rate_num = int(config["rate"].replace("+", "").replace("%", ""))
@@ -350,18 +317,9 @@ def render_voice_page():
                                 run_async(generate_edge_audio_with_emotion(chunk, voice_id, chunk_file, rate_str=rate_val, pitch_str=pitch_val, emotion=audio_emotion))
                                 temp_files.append(chunk_file)
                                 
-                            if PYDUB_AVAILABLE:
-                                combined_audio = AudioSegment.from_file(temp_files[0])
-                                for tf in temp_files[1:]:
-                                    if os.path.exists(tf):
-                                        combined_audio += AudioSegment.from_file(tf)
-                                combined_audio.export(filename, format="mp3")
-                                for tf in temp_files:
-                                    try:
-                                        os.remove(tf)
-                                    except:
-                                        pass
-                            else:
+                            if os.path.exists(temp_files[0]):
+                                if os.path.exists(filename):
+                                    os.remove(filename)
                                 os.rename(temp_files[0], filename)
                         else:
                             run_async(generate_edge_audio_with_emotion(audio_text, voice_id, filename, rate_str=rate_val, pitch_str=pitch_val, emotion=audio_emotion))
