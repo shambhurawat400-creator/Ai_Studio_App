@@ -106,13 +106,26 @@ def clone_voice_to_elevenlabs(name, file_path):
     return None
 
 def get_elevenlabs_voices():
+    # डिफ़ॉल्ट प्रो ElevenLabs वॉइस IDs ताकि API फेच फेल होने पर भी कैरेक्टर्स हमेशा उपलब्ध रहें
+    fallback_voices = {
+        "Rachel (Professional Female)": "21m00Tcm4TlvDq8ikWAM",
+        "Dom (Deep Calm Male)": "AZnzlk1XvdvUeBnXmlld",
+        "Bella (Soft Narrative Female)": "EXAVITQu4vr4xnSDxMaL",
+        "Antoni (Warm Cinematic Male)": "ErXwobaYiN019PkySvjV",
+        "Elli (Expressive Young Female)": "MF3mGyEYCl7XYWbV9V6O",
+        "Josh (Deep Energetic Male)": "TxGEqnHWrfWFTfGW9XjX"
+    }
     url = "https://api.elevenlabs.io/v1/voices"
     headers = {"xi-api-key": ELEVENLABS_API_KEY}
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        voices = response.json().get("voices", [])
-        return {v["name"]: v["voice_id"] for v in voices}
-    return {}
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            voices = response.json().get("voices", [])
+            if voices:
+                return {v["name"]: v["voice_id"] for v in voices}
+    except Exception:
+        pass
+    return fallback_voices
 
 def render_voice_page():
     str_lit.subheader("🎙️ AI Master Voice & Professional Studio (Pro Version)")
@@ -137,7 +150,6 @@ def render_voice_page():
                 with open(save_path, "wb") as f:
                     f.write(uploaded_sample.getbuffer())
                 
-                # Register to ElevenLabs if possible
                 el_vid = clone_voice_to_elevenlabs(clone_name, save_path)
                 if el_vid:
                     str_lit.success(f"🎉 '{clone_name}' की आवाज़ ElevenLabs और सिस्टम पर सफलतापूर्वक सेव हो गई है!")
@@ -322,10 +334,9 @@ def render_voice_page():
 
                     if config["type"] == "elevenlabs":
                         try:
-                            # अब यह क्लोन या ElevenLabs वॉइस आईडी का उपयोग करके आपकी स्क्रिप्ट को बिल्कुल सही तरीके से टेक्स्ट-टू-स्पीच में जनरेट करेगा
+                            # अब यह ElevenLabs की चुनी हुई वॉइस आईडी से आपकी स्क्रिप्ट को टेक्स्ट-टू-स्पीच में परफेक्ट जनरेट करेगा
                             generate_elevenlabs_audio(audio_text, config["voice_id"], filename)
                         except Exception:
-                            # यदि कोई प्लान एरर या लिमिट आती है, तो ऐप सुरक्षित रूप से न्यूरल वॉइस पर स्विच हो जाएगा
                             run_async(generate_edge_audio_with_emotion(audio_text, current_lang_voices["male_deep"], filename, emotion=audio_emotion))
                     else:
                         voice_id = config["voice"]
