@@ -12,6 +12,7 @@ import streamlit as st
 from groq import Groq
 from datetime import date
 import time
+from supabase import create_client, Client
 
 # Import all custom modules safely
 from script_gen import render_script_page
@@ -21,6 +22,25 @@ from voice_tools import render_voice_page
 
 # Page Configuration
 st.set_page_config(page_title="AI Studio Dashboard", page_icon="🤖", layout="wide")
+
+# --- SUPABASE AUTO-PING FIX (सोने से बचाने के लिए) ---
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+
+if not SUPABASE_URL:
+    try:
+        SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+        SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
+    except Exception:
+        pass
+
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        # ऐप खुलते ही डेटाबेस को पिंग भेजने के लिए ताकि प्रोजेक्ट पॉज न हो
+        supabase.table("profiles").select("*").limit(1).execute()
+    except Exception:
+        pass
 
 # Dynamic API Key Management (Session State & Secure Fallback)
 if "active_api_keys" not in st.session_state:
