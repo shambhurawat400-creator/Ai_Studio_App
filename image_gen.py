@@ -136,9 +136,15 @@ def render_image_page():
 
     gemini_client = get_gemini_client()
     if gemini_client:
-        st.caption("✅ Nano Banana (high quality) active")
+        st.caption("✅ Nano Banana (high quality) active — quota khatam hote hi free Pollinations pe auto-switch ho jayega")
     else:
         st.warning("⚠️ GEMINI_API_KEY सेट नहीं है — free Pollinations model use होगा (lower quality). Behtar quality ke liye AI Studio se free key lo aur `GEMINI_API_KEY` secret set karo.")
+
+    provider_choice = st.radio(
+        "🔀 Image Provider चुनो:",
+        ["🤖 Auto (Nano Banana try karo, fail hone par free wale pe switch)", "✨ सिर्फ Nano Banana (high quality)", "🆓 सिर्फ Free (Pollinations, unlimited)"],
+        horizontal=False,
+    )
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
@@ -270,7 +276,11 @@ def render_image_page():
                 provider = None
                 url = None
 
-                if gemini_client:
+                use_nano_banana = gemini_client and provider_choice != "🆓 सिर्फ Free (Pollinations, unlimited)"
+                use_pollinations_only = provider_choice == "🆓 सिर्फ Free (Pollinations, unlimited)"
+                nano_banana_only = provider_choice == "✨ सिर्फ Nano Banana (high quality)"
+
+                if use_nano_banana:
                     ref_bytes = character.get("reference_image") if character else None
                     img_bytes = generate_with_nano_banana(gemini_client, final_prompt, aspect_ratio_str, ref_bytes)
                     if img_bytes:
@@ -278,11 +288,13 @@ def render_image_page():
                         if character and not character.get("reference_image"):
                             character["reference_image"] = img_bytes
 
-                if not img_bytes:
+                if not img_bytes and not nano_banana_only:
+                    # Auto mode falls back here; "Free only" mode always lands here
                     seed_val = stable_seed_from_name(selected_character_name, salt=i) if character else datetime.now().microsecond + i
                     url = build_pollinations_url(final_prompt, final_neg, fallback_width, fallback_height, seed_val)
                     img_bytes = fetch_image_bytes(url)
-                    provider = "Pollinations (fallback)" if img_bytes else None
+                    if img_bytes:
+                        provider = "Pollinations (fallback)" if not use_pollinations_only else "Pollinations (free)"
 
                 generated.append({"bytes": img_bytes, "provider": provider, "url": url})
 
