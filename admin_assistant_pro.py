@@ -38,6 +38,8 @@ KNOWN_CONFIG_KEYS = {
     "pricing_rules": "Pricing/plan details — ye 'Pricing' page mein sabko dikhta hai",
     "custom_notice": "Koi bhi announcement/notice jo Dashboard ke top pe sabko dikhna chahiye",
     "maintenance_message": "Jab koi feature band ho to users ko dikhne wala message",
+    "pro_price_inr": "Pro plan ki price (sirf number, jaise '99' ya '199') — Upgrade page pe yahi amount charge hota hai",
+    "upi_id": "Admin ki UPI ID (jaise 'name@paytm') — jahan users Pro plan ka payment karenge",
 }
 
 SYSTEM_PROMPT = f"""You are the Admin Control Assistant for a Streamlit app called AI Studio Hub.
