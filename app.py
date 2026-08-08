@@ -16,6 +16,7 @@ from voice_tools import render_voice_page
 from auth_pro import get_supabase_client, restore_session, render_auth_ui, render_account_menu
 from settings_pro import render_settings_page
 from admin_assistant_pro import is_admin, get_config, is_feature_enabled, render_admin_assistant_page, FEATURE_KEYS
+from billing_pro import is_pro_user, render_manual_upgrade_ui, render_admin_approval_panel, FREE_NANO_BANANA_DAILY_LIMIT
 
 st.set_page_config(
     page_title="AI Studio Hub",
@@ -92,6 +93,9 @@ for flag_key, label in FEATURE_KEYS.items():
     elif admin_user:
         pages.append(f"🚧 {label}")
 pages.append("💳 Pricing")
+pages.append("💎 Upgrade to Pro")
+if admin_user:
+    pages.append("🧾 Pending Payments")
 pages.append("⚙️ Settings")
 if admin_user:
     pages.append("🛠️ Admin Assistant")
@@ -199,7 +203,7 @@ elif st.session_state.current_page in ("🎙️ Voice Studio", "🚧 🎙️ Voi
 elif st.session_state.current_page in ("🎨 AI Image", "🚧 🎨 AI Image"):
     if st.session_state.current_page.startswith("🚧"):
         st.warning(get_config(supabase, "maintenance_message", "🚧 Ye feature abhi maintenance mode mein hai."))
-    render_image_page()
+    render_image_page(supabase, st.session_state.user)
 
 elif st.session_state.current_page in ("🎬 Image to Video", "🚧 🎬 Image to Video"):
     if st.session_state.current_page.startswith("🚧"):
@@ -209,6 +213,21 @@ elif st.session_state.current_page in ("🎬 Image to Video", "🚧 🎬 Image t
 elif st.session_state.current_page == "💳 Pricing":
     st.subheader("💳 Pricing / Plans")
     st.markdown(get_config(supabase, "pricing_rules", "फ़्री प्लान: रोजाना 10 मैसेज। प्रो प्लान: ₹199/महीना।"))
+
+elif st.session_state.current_page == "💎 Upgrade to Pro":
+    st.subheader("💎 Upgrade to Pro")
+    user_pro = is_pro_user(supabase, st.session_state.user)
+    if user_pro:
+        st.success("✅ Aap already Pro user hain! Sabhi premium features unlimited hain.")
+    else:
+        pro_price = float(get_config(supabase, "pro_price_inr", "99"))
+        upi_id = get_config(supabase, "upi_id", "")
+        st.write(f"**Free plan:** Nano Banana (high-quality image) sirf {FREE_NANO_BANANA_DAILY_LIMIT}/din")
+        st.write("**Pro plan:** Nano Banana **unlimited** use, koi daily cap nahi")
+        render_manual_upgrade_ui(supabase, st.session_state.user, upi_id, pro_price)
+
+elif st.session_state.current_page == "🧾 Pending Payments" and admin_user:
+    render_admin_approval_panel(supabase)
 
 elif st.session_state.current_page == "⚙️ Settings":
     render_settings_page(supabase)
