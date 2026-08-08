@@ -1,142 +1,276 @@
+"""
+AI Video & Story Script Writer & Chatbot Hub (Pro Version)
+------------------------------------------------------------
+Production-hardened rewrite:
+- No hardcoded API key (env var / st.secrets only)
+- Cached Groq client (not rebuilt on every rerun)
+- Strict instruction-following: system prompt + optional custom
+  instructions box, so the model sticks to exactly what you ask for
+- Retry logic for transient API failures
+- Sanitized filenames for downloads
+- Chat history trimmed to avoid unbounded token growth
+"""
+
+import re
+import time
+import logging
+
 import streamlit as st
 from groq import Groq
 
-def render_script_page(groq_client):
+logger = logging.getLogger(__name__)
+
+MODEL_NAME = "llama-3.1-8b-instant"
+MAX_CHAT_HISTORY_MESSAGES = 20  # keep last N messages so context doesn't grow unbounded
+MAX_RETRIES = 2
+
+
+# ---------------------------------------------------------------------------
+# Client setup
+# ---------------------------------------------------------------------------
+
+@st.cache_resource(show_spinner=False)
+def get_groq_client() -> Groq | None:
+    """
+    Build the Groq client once per session. API key must come from
+    st.secrets or the GROQ_API_KEY environment variable — never hardcode it.
+    """
+    import os
+
+    api_key = None
+    try:
+        api_key = st.secrets.get("GROQ_API_KEY")
+    except Exception:
+        pass
+    if not api_key:
+        api_key = os.environ.get("GROQ_API_KEY")
+
+    if not api_key:
+        return None
+
+    try:
+        return Groq(api_key=api_key)
+    except Exception as e:
+        logger.error("Failed to initialize Groq client: %s", e)
+        return None
+
+
+def call_groq_with_retry(client: Groq, **kwargs):
+    """Call the chat completion endpoint with a couple of retries on transient errors."""
+    last_error = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except Exception as e:
+            last_error = e
+            logger.warning("Groq call attempt %d/%d failed: %s", attempt, MAX_RETRIES, e)
+            time.sleep(1.5)
+    raise last_error
+
+
+def sanitize_filename(text: str) -> str:
+    text = text.strip()[:40]
+    return re.sub(r"[^\w\-]+", "_", text) or "script"
+
+
+# ---------------------------------------------------------------------------
+# Main page
+# ---------------------------------------------------------------------------
+
+def render_script_page(groq_client=None):
     st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए स्क्रिप्ट तैयार कर सकते हैं और AI चैटबॉट से बात कर सकते हैं:")
 
-    # सुरक्षित तरीके से API Key लोड करने का सिस्टम (सीधे कोड में सुरक्षित रूप से सेट)
-    SECURE_API_KEY = "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"
-    
-    active_client = groq_client
+    active_client = groq_client or get_groq_client()
     if not active_client:
-        try:
-            if "GROQ_API_KEY" in st.secrets:
-                active_client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-            else:
-                active_client = Groq(api_key=SECURE_API_KEY)
-        except Exception:
-            pass
+        st.error("🚨 GROQ_API_KEY सेट नहीं है। `.streamlit/secrets.toml` में या environment variable के रूप में सेट करें।")
 
-    # टैब या रेडियो बटन ताकि स्क्रिप्ट राइटर और चैटबॉट दोनों अलग-अलग आसानी से काम करें
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
 
     if app_mode == "✍️ Pro Script Writer":
-        topic = st.text_input("स्क्रिप्ट का टॉपिक/विषय दर्ज करें:", placeholder="जैसे: Horror story near a haunted well in an ancient village")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            script_type = st.selectbox("प्लेटफॉर्म/प्रकार:", [
-                "YouTube Video (Full Cinematic Script)", 
-                "Instagram Reel / YouTube Shorts (Fast-Paced)", 
-                "Horror Story / Suspense Storytelling",
-                "Motivational / Documentary Speech"
-            ])
-        with col2:
-            tone_style = st.selectbox("टोन और अंदाज़ (Tone):", [
-                "Suspense & Thrilling (रहस्यमयी और डरावना)",
-                "Emotional & Dramatic (भावुक और गहरा)",
-                "Energetic & Hype (जोशीला और रोमांचक)",
-                "Informative & Engaging (दिल्चस्प और जानकारीपूर्ण)"
-            ])
+        _render_script_writer(active_client)
+    else:
+        _render_chatbot(active_client)
 
-        length_option = st.selectbox("लंबाई और विस्तार (Length & Depth):", [
-            "मध्यम स्क्रिप्ट (1000 - 2000 शब्द)",
-            "लंबी कहानी / वीडियो (3000 - 5000 शब्द)",
-            "महाकाव्य / बड़ी सीरीज़ (8000+ शब्द)"
+
+# ---------------------------------------------------------------------------
+# Script Writer
+# ---------------------------------------------------------------------------
+
+def _build_system_prompt(script_type: str, tone_style: str, extra_instructions: str) -> str:
+    """
+    A single, strict system prompt shared across all parts, so the model
+    stays on-topic and follows exactly what the user asked — nothing added,
+    nothing skipped.
+    """
+    base = (
+        "You are a world-class professional scriptwriter. "
+        "Follow the user's instructions with strict precision. "
+        f"Format: {script_type}. Tone: {tone_style}. "
+        "Include vivid visual & audio cues (e.g., [Camera Pan], [SFX: Heavy Wind], [Dark Lighting]). "
+        "Write engaging dialogue and maintain strong narrative flow. "
+        "Do NOT add content, themes, or characters that are not implied by the user's topic. "
+        "Do NOT include meta-commentary, disclaimers, or notes about being an AI. "
+        "Write entirely in rich, natural Hindi/Hinglish unless the user specifies another language."
+    )
+    if extra_instructions.strip():
+        base += f"\n\nAdditional mandatory instructions from the user (follow these exactly, they override defaults if they conflict): {extra_instructions.strip()}"
+    return base
+
+
+def _render_script_writer(active_client):
+    topic = st.text_input(
+        "स्क्रिप्ट का टॉपिक/विषय दर्ज करें:",
+        placeholder="जैसे: Horror story near a haunted well in an ancient village",
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        script_type = st.selectbox("प्लेटफॉर्म/प्रकार:", [
+            "YouTube Video (Full Cinematic Script)",
+            "Instagram Reel / YouTube Shorts (Fast-Paced)",
+            "Horror Story / Suspense Storytelling",
+            "Motivational / Documentary Speech",
+        ])
+    with col2:
+        tone_style = st.selectbox("टोन और अंदाज़ (Tone):", [
+            "Suspense & Thrilling (रहस्यमयी और डरावना)",
+            "Emotional & Dramatic (भावुक और गहरा)",
+            "Energetic & Hype (जोशीला और रोमांचक)",
+            "Informative & Engaging (दिल्चस्प और जानकारीपूर्ण)",
         ])
 
-        if st.button("Generate Pro Cinematic Script ✍️🎬", type="primary", use_container_width=True):
-            if not topic.strip():
-                st.warning("कृपया पहले टॉपिक दर्ज करें!")
-            elif not active_client:
-                st.error("🚨 API Key कनेक्ट नहीं हो पाई है!")
-            else:
-                with st.spinner("प्रो AI डायरेक्टर स्क्रिप्ट, विजुअल क्यूज और डायलॉग तैयार कर रहा है..."):
-                    try:
-                        full_script = ""
-                        
-                        if "8000+" in length_option:
-                            parts = 5
-                            words_per_part = "लगभग 1500-2000 शब्दों का विस्तार, गहरे विवरण के साथ"
-                        elif "3000 - 5000" in length_option:
-                            parts = 3
-                            words_per_part = "लगभग 1200-1500 शब्दों का विस्तार"
-                        else:
-                            parts = 1
-                            words_per_part = "लगभग 1000 शब्दों का संपूर्ण विस्तार"
+    length_option = st.selectbox("लंबाई और विस्तार (Length & Depth):", [
+        "मध्यम स्क्रिप्ट (1000 - 2000 शब्द)",
+        "लंबी कहानी / वीडियो (3000 - 5000 शब्द)",
+        "महाकाव्य / बड़ी सीरीज़ (8000+ शब्द)",
+    ])
 
-                        previous_context = ""
-                        
-                        for i in range(1, parts + 1):
-                            if parts > 1:
-                                prompt = f"""You are a World-Class Hollywood/Bollywood Scriptwriter and Master Storyteller. 
-                                Write Part {i} of {parts} for a professional {script_type} with a '{tone_style}' tone on the topic: '{topic}'.
-                                Length requirement: {words_per_part}.
-                                Crucial Guidelines:
-                                - Include vivid Visual & Audio Cues (e.g., [Camera Pan], [SFX: Heavy Wind], [Dark Lighting]).
-                                - Write engaging dialogues and build deep dramatic tension.
-                                - Maintain strict narrative flow from previous context: '{previous_context[-400:]}'
-                                - Write entirely in rich, engaging Hindi/Hinglish. Do not stop abruptly."""
-                            else:
-                                prompt = f"""You are a World-Class Scriptwriter. Write a detailed, professional {script_type} with a '{tone_style}' tone on the topic: '{topic}'.
-                                Include powerful hooks, scene descriptions, visual cues [Camera Angles, SFX], and emotional dialogues. Write in rich Hindi/Hinglish."""
+    extra_instructions = st.text_area(
+        "🎯 कोई खास/सटीक निर्देश (Optional — जो भी exact command doge, wahi follow hoga):",
+        placeholder="जैसे: सिर्फ Hindi mein likho, flashback mat dalna, ek narrator character rakhna...",
+        height=90,
+    )
 
-                            response = active_client.chat.completions.create(
-                                model="llama-3.1-8b-instant", 
-                                messages=[{"role": "user", "content": prompt}],
-                                max_tokens=4000
-                            )
-                            
-                            part_content = response.choices[0].message.content
-                            full_script += f"\n\n==================== [ सीन / भाग {i} ] ====================\n\n" + part_content
-                            previous_context = part_content
+    if st.button("Generate Pro Cinematic Script ✍️🎬", type="primary", use_container_width=True):
+        if not topic.strip():
+            st.warning("कृपया पहले टॉपिक दर्ज करें!")
+            return
+        if not active_client:
+            st.error("🚨 API Key कनेक्ट नहीं हो पाई है!")
+            return
 
-                        st.text_area("प्रो सिनेमैटिक स्क्रिप्ट:", value=full_script, height=480)
-                        
-                        st.download_button(
-                            label="📥 Download Pro Script as Text File",
-                            data=full_script,
-                            file_name=f"pro_script_{topic[:15].strip()}.txt",
-                            mime="text/plain"
+        with st.spinner("प्रो AI डायरेक्टर स्क्रिप्ट, विजुअल क्यूज और डायलॉग तैयार कर रहा है..."):
+            try:
+                if "8000+" in length_option:
+                    parts, words_per_part = 5, "लगभग 1500-2000 शब्दों का विस्तार, गहरे विवरण के साथ"
+                elif "3000 - 5000" in length_option:
+                    parts, words_per_part = 3, "लगभग 1200-1500 शब्दों का विस्तार"
+                else:
+                    parts, words_per_part = 1, "लगभग 1000 शब्दों का संपूर्ण विस्तार"
+
+                system_prompt = _build_system_prompt(script_type, tone_style, extra_instructions)
+                full_script = ""
+                previous_context = ""
+
+                for i in range(1, parts + 1):
+                    if parts > 1:
+                        user_prompt = (
+                            f"Write Part {i} of {parts} on the topic: '{topic}'. "
+                            f"Length requirement: {words_per_part}. "
+                            f"Continue directly from this previous context (maintain continuity, do not repeat it): "
+                            f"'{previous_context[-400:]}'"
+                        )
+                    else:
+                        user_prompt = (
+                            f"Write a complete script on the topic: '{topic}'. "
+                            f"Length requirement: {words_per_part}. "
+                            "Include a strong hook at the start."
                         )
 
-                    except Exception as e:
-                        st.error(f"Error: {str(e)}")
+                    response = call_groq_with_retry(
+                        active_client,
+                        model=MODEL_NAME,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        max_tokens=4000,
+                        temperature=0.8,
+                    )
 
-    else:
-        # 💬 AI Assistant Chatbot Section (पूर्णतः फिक्स किया गया)
-        st.subheader("💬 AI Assistant & Chatbot")
-        st.write("यहाँ आप AI से किसी भी तरह की मदद, आइडिया या सवाल पूछ सकते हैं:")
+                    part_content = response.choices[0].message.content
+                    if not part_content or not part_content.strip():
+                        raise RuntimeError(f"Part {i} के लिए खाली response मिला — दोबारा कोशिश करें।")
 
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
+                    full_script += f"\n\n==================== [ सीन / भाग {i} ] ====================\n\n" + part_content
+                    previous_context = part_content
 
-        # पुराने मैसेज दिखाएं
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+                st.text_area("प्रो सिनेमैटिक स्क्रिप्ट:", value=full_script, height=480)
 
-        # यूजर का इनपुट लें
-        if user_query := st.chat_input("अपना सवाल यहाँ पूछें..."):
-            st.session_state.messages.append({"role": "user", "content": user_query})
-            with st.chat_message("user"):
-                st.markdown(user_query)
+                st.download_button(
+                    label="📥 Download Pro Script as Text File",
+                    data=full_script,
+                    file_name=f"pro_script_{sanitize_filename(topic)}.txt",
+                    mime="text/plain",
+                )
 
-            if not active_client:
-                st.error("🚨 AI Client उपलब्ध नहीं है!")
-            else:
-                with st.chat_message("assistant"):
-                    with st.spinner("AI सोच रहा है..."):
-                        try:
-                            # चैटबॉट के लिए बातचीत का इतिहास भेजें
-                            chat_response = active_client.chat.completions.create(
-                                model="llama-3.1-8b-instant",
-                                messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
-                                max_tokens=2000
-                            )
-                            bot_reply = chat_response.choices[0].message.content
-                            st.markdown(bot_reply)
-                            st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-                        except Exception as e:
-                            st.error(f"Chat Error: {str(e)}")
+            except Exception as e:
+                logger.exception("Script generation failed")
+                st.error(f"Error: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# Chatbot
+# ---------------------------------------------------------------------------
+
+CHATBOT_SYSTEM_PROMPT = (
+    "You are a precise, helpful AI assistant. Follow the user's instructions exactly as given — "
+    "do not add unrelated information, do not change the requested format or language, and do not "
+    "pad your answers with unnecessary content. If a request is ambiguous, make a reasonable "
+    "assumption and proceed rather than refusing."
+)
+
+
+def _render_chatbot(active_client):
+    st.subheader("💬 AI Assistant & Chatbot")
+    st.write("यहाँ आप AI से किसी भी तरह की मदद, आइडिया या सवाल पूछ सकते हैं:")
+
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    if st.button("🗑️ Clear Chat"):
+        st.session_state.messages = []
+        st.rerun()
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if user_query := st.chat_input("अपना सवाल यहाँ पूछें..."):
+        st.session_state.messages.append({"role": "user", "content": user_query})
+        with st.chat_message("user"):
+            st.markdown(user_query)
+
+        if not active_client:
+            st.error("🚨 AI Client उपलब्ध नहीं है!")
+            return
+
+        with st.chat_message("assistant"):
+            with st.spinner("AI सोच रहा है..."):
+                try:
+                    trimmed_history = st.session_state.messages[-MAX_CHAT_HISTORY_MESSAGES:]
+                    chat_response = call_groq_with_retry(
+                        active_client,
+                        model=MODEL_NAME,
+                        messages=[{"role": "system", "content": CHATBOT_SYSTEM_PROMPT}]
+                        + [{"role": m["role"], "content": m["content"]} for m in trimmed_history],
+                        max_tokens=2000,
+                        temperature=0.7,
+                    )
+                    bot_reply = chat_response.choices[0].message.content
+                    st.markdown(bot_reply)
+                    st.session_state.messages.append({"role": "assistant", "content": bot_reply})
+                except Exception as e:
+                    logger.exception("Chat completion failed")
+                    st.error(f"Chat Error: {str(e)}")
