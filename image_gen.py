@@ -26,7 +26,7 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-NANO_BANANA_MODEL = "gemini-2.5-flash-image"
+NANO_BANANA_MODEL_CANDIDATES = ["gemini-2.5-flash-image", "gemini-2.5-flash-image-preview"]
 MAX_DIMENSION = 2048  # cap for the Pollinations fallback path
 
 
@@ -59,7 +59,12 @@ def get_gemini_client():
 
 
 def generate_with_nano_banana(client, prompt_text: str, aspect_ratio: str, reference_image_bytes):
-    """Returns image bytes on success, or None (caller falls back to Pollinations)."""
+    """
+    Returns (image_bytes_or_None, error_message_or_None).
+    Tries each known model-name variant, and with/without the aspect-ratio
+    config, so we can pinpoint the exact failure reason (bad key, model not
+    found, quota exceeded, region restriction, etc.) instead of hiding it.
+    """
     from google.genai import types
 
     contents = [prompt_text]
@@ -69,24 +74,25 @@ def generate_with_nano_banana(client, prompt_text: str, aspect_ratio: str, refer
         except Exception as e:
             logger.warning("Could not decode reference image, skipping it: %s", e)
 
-    try:
-        config = types.GenerateContentConfig(image_config=types.ImageConfig(aspect_ratio=aspect_ratio))
-        response = client.models.generate_content(model=NANO_BANANA_MODEL, contents=contents, config=config)
-    except Exception as e:
-        logger.info("Aspect-ratio config not supported, retrying without it: %s", e)
-        try:
-            response = client.models.generate_content(model=NANO_BANANA_MODEL, contents=contents)
-        except Exception as e2:
-            logger.warning("Nano Banana generation failed: %s", e2)
-            return None
+    last_error = None
+    for model_name in NANO_BANANA_MODEL_CANDIDATES:
+        for use_config in (True, False):
+            try:
+                if use_config:
+                    config = types.GenerateContentConfig(image_config=types.ImageConfig(aspect_ratio=aspect_ratio))
+                    response = client.models.generate_content(model=model_name, contents=contents, config=config)
+                else:
+                    response = client.models.generate_content(model=model_name, contents=contents)
 
-    try:
-        for part in response.candidates[0].content.parts:
-            if getattr(part, "inline_data", None) is not None:
-                return part.inline_data.data
-    except Exception as e:
-        logger.warning("Could not parse Nano Banana response: %s", e)
-    return None
+                for part in response.candidates[0].content.parts:
+                    if getattr(part, "inline_data", None) is not None:
+                        return part.inline_data.data, None
+                last_error = f"[{model_name}] Response mila lekin usmein koi image data nahi tha."
+            except Exception as e:
+                last_error = f"[{model_name}] {type(e).__name__}: {e}"
+                logger.warning("Nano Banana attempt failed: %s", last_error)
+
+    return None, last_error
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +151,15 @@ def render_image_page():
         ["🤖 Auto (Nano Banana try karo, fail hone par free wale pe switch)", "✨ सिर्फ Nano Banana (high quality)", "🆓 सिर्फ Free (Pollinations, unlimited)"],
         horizontal=False,
     )
+
+    if gemini_client and st.button("🔍 Test Nano Banana Connection"):
+        with st.spinner("Connection test ho raha hai..."):
+            test_bytes, test_error = generate_with_nano_banana(gemini_client, "a simple red circle on white background", "1:1", None)
+            if test_bytes:
+                st.success("✅ Nano Banana kaam kar raha hai!")
+                st.image(test_bytes, width=150)
+            else:
+                st.error(f"❌ Connection fail: {test_error}")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
@@ -269,12 +284,13 @@ def render_image_page():
             final_prompt = ", ".join(prompt_parts)
             final_neg = neg_prompt.strip() if neg_prompt.strip() else "blurry, low quality"
 
-            generated = []  # {"bytes": bytes|None, "provider": str|None, "url": str|None}
+            generated = []  # {"bytes": bytes|None, "provider": str|None, "url": str|None, "error": str|None}
 
             for i in range(num_images):
                 img_bytes = None
                 provider = None
                 url = None
+                nb_error = None
 
                 use_nano_banana = gemini_client and provider_choice != "🆓 सिर्फ Free (Pollinations, unlimited)"
                 use_pollinations_only = provider_choice == "🆓 सिर्फ Free (Pollinations, unlimited)"
@@ -282,7 +298,7 @@ def render_image_page():
 
                 if use_nano_banana:
                     ref_bytes = character.get("reference_image") if character else None
-                    img_bytes = generate_with_nano_banana(gemini_client, final_prompt, aspect_ratio_str, ref_bytes)
+                    img_bytes, nb_error = generate_with_nano_banana(gemini_client, final_prompt, aspect_ratio_str, ref_bytes)
                     if img_bytes:
                         provider = "Nano Banana"
                         if character and not character.get("reference_image"):
@@ -296,7 +312,7 @@ def render_image_page():
                     if img_bytes:
                         provider = "Pollinations (fallback)" if not use_pollinations_only else "Pollinations (free)"
 
-                generated.append({"bytes": img_bytes, "provider": provider, "url": url})
+                generated.append({"bytes": img_bytes, "provider": provider, "url": url, "error": nb_error})
 
             success_count = sum(1 for g in generated if g["bytes"] is not None)
             if success_count == 0:
@@ -306,13 +322,16 @@ def render_image_page():
 
             cols = st.columns(min(num_images, 2))
             for idx, item in enumerate(generated):
-                img_bytes, provider, url = item["bytes"], item["provider"], item["url"]
+                img_bytes, provider, url, nb_error = item["bytes"], item["provider"], item["url"], item["error"]
                 with cols[idx % len(cols)]:
                     if img_bytes:
                         caption = f"Style: {style_option} | #{idx + 1}"
                         if provider:
                             caption += f" | {provider}"
                         st.image(img_bytes, caption=caption, use_container_width=True)
+                        if nb_error and "Pollinations" in (provider or ""):
+                            with st.expander("⚠️ Nano Banana kyun fail hua (debug)"):
+                                st.code(nb_error)
                         h = short_hash(img_bytes)
                         st.download_button(
                             label=f"📥 Download Image {idx + 1}",
@@ -331,6 +350,9 @@ def render_image_page():
                             st.success("📁 प्रोजेक्ट सफलतापूर्वक सेव हो गया!")
                     else:
                         st.warning(f"⚠️ Image #{idx + 1} generate नहीं हो पाई।")
+                        if nb_error:
+                            with st.expander("❌ Exact error dekho (debug)"):
+                                st.code(nb_error)
                         if url:
                             st.markdown(f"[🔗 Direct link try karo]({url})")
 
