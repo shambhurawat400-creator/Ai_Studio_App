@@ -31,7 +31,7 @@ MAX_DIMENSION = 2048  # cap for the Pollinations fallback path
 
 
 # ---------------------------------------------------------------------------
-# Nano Banana (Gemini) client
+# Nano Banana (Gemini) client with Hardcoded Free Key Integration
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
@@ -41,11 +41,14 @@ def get_gemini_client():
     except ImportError:
         return None
 
-    api_key = None
-    try:
-        api_key = st.secrets.get("GEMINI_API_KEY")
-    except Exception:
-        pass
+    # आपकी दी गई फिक्स और डायरेक्ट Gemini API Key यहाँ सेट कर दी गई है
+    api_key = "AQ.Ab8RN6JtgZXZ2tJeH__RkR4dKJDmZal3w5HJdUo3DI1cuUobLA"
+    
+    if not api_key:
+        try:
+            api_key = st.secrets.get("GEMINI_API_KEY")
+        except Exception:
+            pass
     if not api_key:
         api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -144,7 +147,7 @@ def render_image_page():
     if gemini_client:
         st.caption("✅ Nano Banana (high quality) active — quota khatam hote hi free Pollinations pe auto-switch ho jayega")
     else:
-        st.warning("⚠️ GEMINI_API_KEY सेट नहीं है — free Pollinations model use होगा (lower quality). Behtar quality ke liye AI Studio se free key lo aur `GEMINI_API_KEY` secret set karo.")
+        st.warning("⚠️ Gemini client initialize nahi ho paaya. Please check API key.")
 
     provider_choice = st.radio(
         "🔀 Image Provider चुनो:",
@@ -156,7 +159,7 @@ def render_image_page():
         with st.spinner("Connection test ho raha hai..."):
             test_bytes, test_error = generate_with_nano_banana(gemini_client, "a simple red circle on white background", "1:1", None)
             if test_bytes:
-                st.success("✅ Nano Banana kaam kar raha hai!")
+                st.success("✅ Nano Banana kaam kar raha है!")
                 st.image(test_bytes, width=150)
             else:
                 st.error(f"❌ Connection fail: {test_error}")
@@ -170,7 +173,7 @@ def render_image_page():
 
     # --- Character Profile Manager ---
     with st.expander("🎭 Character Profile Manager (Consistency के लिए)", expanded=False):
-        st.write("एक बार कैरेक्टर describe करो — पहली image apne-aap reference ban jaayegi aur future images usi look ko follow karengi:")
+        st.write("एक बार कैरेक्टर describe करो — पहली image apne-aap reference ban jayegi aur future images usi look ko follow karengi:")
         char_name = st.text_input("कैरेक्टर का नाम:", placeholder="जैसे: Grandma Kamla")
         char_desc = st.text_area(
             "कैरेक्टर का पूरा विवरण:",
@@ -284,7 +287,7 @@ def render_image_page():
             final_prompt = ", ".join(prompt_parts)
             final_neg = neg_prompt.strip() if neg_prompt.strip() else "blurry, low quality"
 
-            generated = []  # {"bytes": bytes|None, "provider": str|None, "url": str|None, "error": str|None}
+            generated = []
 
             for i in range(num_images):
                 img_bytes = None
@@ -305,7 +308,6 @@ def render_image_page():
                             character["reference_image"] = img_bytes
 
                 if not img_bytes and not nano_banana_only:
-                    # Auto mode falls back here; "Free only" mode always lands here
                     seed_val = stable_seed_from_name(selected_character_name, salt=i) if character else datetime.now().microsecond + i
                     url = build_pollinations_url(final_prompt, final_neg, fallback_width, fallback_height, seed_val)
                     img_bytes = fetch_image_bytes(url)
