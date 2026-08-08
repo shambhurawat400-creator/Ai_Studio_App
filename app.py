@@ -20,8 +20,12 @@ from image_gen import render_image_page
 from video_gen import render_video_page
 from voice_tools import render_voice_page
 
-# Page Configuration
-st.set_page_config(page_title="AI Studio Dashboard", page_icon="🤖", layout="wide")
+# Page Configuration with Custom Logo & Title
+st.set_page_config(
+    page_title="AI Studio Hub",
+    page_icon="logo.png",  # यह आपके नए लोगो को सेट करेगा
+    layout="wide"
+)
 
 # --- SUPABASE AUTO-PING FIX (सोने से बचाने के लिए) ---
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
@@ -37,7 +41,6 @@ if not SUPABASE_URL:
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        # ऐप खुलते ही डेटाबेस को पिंग भेजने के लिए ताकि प्रोजेक्ट पॉज न हो
         supabase.table("profiles").select("*").limit(1).execute()
     except Exception:
         pass
@@ -52,7 +55,6 @@ if "active_api_keys" not in st.session_state:
     }
 
 def get_groq_client() -> Groq:
-    # पहले session state से कोशिश करेगा, फिर secrets से या सीधे फिक्स की से
     key = st.session_state.active_api_keys.get("GROQ_KEY")
     if not key or "gsk_" not in key:
         key = "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"
@@ -129,7 +131,6 @@ elif st.session_state.current_page == "💬 AI Chatbot":
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
         try:
             groq_client = get_groq_client()
-            # यहाँ एडमिन/कोडिंग असिस्टेंट का सिस्टम प्रॉम्प्ट जोड़ा गया है ताकि यह ऐप डेवलपर की तरह मदद कर सके
             current_messages = [{
                 "role": "system", 
                 "content": "You are a professional Admin Assistant and expert Streamlit/Python developer. Help the user manage their app, write code snippets, and answer questions accurately in Hindi/Hinglish."
