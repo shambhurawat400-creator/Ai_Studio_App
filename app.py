@@ -2,79 +2,83 @@ import sys
 import os
 from pathlib import Path
 
-# --- THE ULTIMATE ROOT PATH FIX ---
 file_path = Path(__file__).resolve()
 parent_dir = file_path.parent
 sys.path.insert(0, str(parent_dir))
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 from groq import Groq
-from datetime import date
-import time
-from supabase import create_client, Client
 
-# Import all custom modules safely
 from script_gen import render_script_page
 from image_gen import render_image_page
 from video_gen import render_video_page
 from voice_tools import render_voice_page
+from auth_pro import get_supabase_client, restore_session, render_auth_ui, render_account_menu
+from settings_pro import render_settings_page
 
-# Page Configuration with Custom Logo & Title (Online link fix for phone icon)
 st.set_page_config(
     page_title="AI Studio Hub",
-    page_icon="https://i.imgur.com/71Q38xq.png",  
-    layout="wide"
+    page_icon="https://i.imgur.com/71Q38xq.png",
+    layout="wide",
 )
 
-# --- SUPABASE AUTO-PING FIX (सोने से बचाने के लिए) ---
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+# ---------------------------------------------------------------------------
+# Auth: this is now the FIRST thing that runs. No page below this point is
+# reachable until a real, Supabase-verified session exists.
+# ---------------------------------------------------------------------------
 
-if not SUPABASE_URL:
-    try:
-        SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
-        SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
-    except Exception:
-        pass
+supabase = get_supabase_client()
+if supabase is None:
+    st.error("🚨 Supabase कनेक्ट नहीं हो पाया। `SUPABASE_URL` और `SUPABASE_KEY` को secrets/env में सेट करें।")
+    st.stop()
 
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        supabase.table("profiles").select("*").limit(1).execute()
-    except Exception:
-        pass
+restore_session(supabase)
 
-# Dynamic API Key Management (Session State & Secure Fallback)
+if "user" not in st.session_state:
+    render_auth_ui(supabase)
+    st.stop()
+
+# ---------------------------------------------------------------------------
+# Groq client — no hardcoded key. Falls back to the app's shared key (from
+# secrets/env) if the user hasn't set a personal key in Settings.
+# ---------------------------------------------------------------------------
+
 if "active_api_keys" not in st.session_state:
-    st.session_state.active_api_keys = {
-        "GROQ_KEY": "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",
-        "GEMINI_KEY": "",
-        "OPENAI_KEY": "",
-        "CUSTOM_VFX_KEY": ""
-    }
+    st.session_state.active_api_keys = {"GROQ_KEY": "", "GEMINI_KEY": "", "OPENAI_KEY": "", "CUSTOM_VFX_KEY": ""}
 
-def get_groq_client() -> Groq:
+
+def get_groq_client():
     key = st.session_state.active_api_keys.get("GROQ_KEY")
-    if not key or "gsk_" not in key:
-        key = "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"
+    if not key or not key.startswith("gsk_"):
+        key = os.environ.get("GROQ_API_KEY", "")
+        if not key:
+            try:
+                key = st.secrets.get("GROQ_API_KEY", "")
+            except Exception:
+                key = ""
+    if not key:
+        return None
     return Groq(api_key=key)
+
 
 if "current_page" not in st.session_state:
     st.session_state.current_page = "🏠 Dashboard"
-
 if "pricing_rules" not in st.session_state:
     st.session_state.pricing_rules = "फ़्री प्लान: रोजाना 10 मैसेज। प्रो प्लान: ₹199/महीना।"
 
-# Main Dashboard UI Layout
-head_col1, head_col2 = st.columns([5, 1])
+# ---------------------------------------------------------------------------
+# Header: title + account menu (email + logout)
+# ---------------------------------------------------------------------------
+
+head_col1, head_col2 = st.columns([3, 2])
 with head_col1:
     st.title("🤖 AI Studio Hub")
+with head_col2:
+    render_account_menu(supabase)
 
 st.write("---")
 
-# Navigation Bar with Script Page Included
-pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎙️ Voice Studio", "🎨 AI Image", "🎬 Image to Video"]
+pages = ["🏠 Dashboard", "💬 AI Chatbot", "📜 AI Script", "🎙️ Voice Studio", "🎨 AI Image", "🎬 Image to Video", "⚙️ Settings"]
 
 nav_cols = st.columns(len(pages))
 for i, page in enumerate(pages):
@@ -85,7 +89,10 @@ for i, page in enumerate(pages):
 
 st.write("---")
 
-# Routing Pages
+# ---------------------------------------------------------------------------
+# Routing
+# ---------------------------------------------------------------------------
+
 if st.session_state.current_page == "🏠 Dashboard":
     st.subheader("👋 Welcome to AI Studio Dashboard!")
     st.info("💡 यहाँ से आप कोई भी AI टूल डायरेक्ट ओपन कर सकते हैं।")
@@ -104,7 +111,7 @@ if st.session_state.current_page == "🏠 Dashboard":
             st.session_state.current_page = "🎙️ Voice Studio"
             st.rerun()
 
-    col4, col5 = st.columns(2)
+    col4, col5, col6 = st.columns(3)
     with col4:
         if st.button("🎨 Open Image Generator", use_container_width=True):
             st.session_state.current_page = "🎨 AI Image"
@@ -113,11 +120,15 @@ if st.session_state.current_page == "🏠 Dashboard":
         if st.button("🎬 Open Video Generator", use_container_width=True):
             st.session_state.current_page = "🎬 Image to Video"
             st.rerun()
+    with col6:
+        if st.button("⚙️ Open Settings", use_container_width=True):
+            st.session_state.current_page = "⚙️ Settings"
+            st.rerun()
 
 elif st.session_state.current_page == "💬 AI Chatbot":
     st.subheader("💬 AI Chat Assistant & Admin Helper")
     st.write("यहाँ आप अपने AI असिस्टेंट से सामान्य सवाल पूछ सकते हैं या भविष्य में ऐप में बदलाव/कोडिंग से जुड़े निर्देश ले सकते हैं।")
-    
+
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = []
 
@@ -129,28 +140,30 @@ elif st.session_state.current_page == "💬 AI Chatbot":
         with st.chat_message("user"):
             st.write(prompt)
         st.session_state.chat_messages.append({"role": "user", "content": prompt})
-        try:
-            groq_client = get_groq_client()
-            current_messages = [{
-                "role": "system", 
-                "content": "You are a professional Admin Assistant and expert Streamlit/Python developer. Help the user manage their app, write code snippets, and answer questions accurately in Hindi/Hinglish."
-            }]
-            for m in st.session_state.chat_messages:
-                current_messages.append({"role": m["role"], "content": m["content"]})
 
-            response = groq_client.chat.completions.create(model="llama-3.1-8b-instant", messages=current_messages)
-            bot_res = response.choices[0].message.content
-            with st.chat_message("assistant"):
-                st.write(bot_res)
-            st.session_state.chat_messages.append({"role": "assistant", "content": bot_res})
-            st.rerun()
-        except Exception as e:
-            st.error(f"Chat Error: {str(e)}")
+        groq_client = get_groq_client()
+        if not groq_client:
+            st.error("🚨 GROQ_API_KEY सेट नहीं है (Settings में अपनी key daal sakte ho, ya app-level secret set karo).")
+        else:
+            try:
+                current_messages = [{
+                    "role": "system",
+                    "content": "You are a professional Admin Assistant and expert Streamlit/Python developer. Follow the user's instructions precisely, do not add unrelated content. Help the user manage their app, write code snippets, and answer questions accurately in Hindi/Hinglish.",
+                }]
+                for m in st.session_state.chat_messages:
+                    current_messages.append({"role": m["role"], "content": m["content"]})
+
+                response = groq_client.chat.completions.create(model="llama-3.1-8b-instant", messages=current_messages)
+                bot_res = response.choices[0].message.content
+                with st.chat_message("assistant"):
+                    st.write(bot_res)
+                st.session_state.chat_messages.append({"role": "assistant", "content": bot_res})
+            except Exception as e:
+                st.error(f"Chat Error: {str(e)}")
 
 elif st.session_state.current_page == "📜 AI Script":
     try:
-        groq_client = get_groq_client()
-        render_script_page(groq_client)
+        render_script_page(get_groq_client())
     except Exception as e:
         st.error(f"Script Page Error: {str(e)}")
 
@@ -162,3 +175,6 @@ elif st.session_state.current_page == "🎨 AI Image":
 
 elif st.session_state.current_page == "🎬 Image to Video":
     render_video_page()
+
+elif st.session_state.current_page == "⚙️ Settings":
+    render_settings_page(supabase)
