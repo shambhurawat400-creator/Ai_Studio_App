@@ -26,7 +26,6 @@ MAX_DIMENSION = 2048
 # ---------------------------------------------------------------------------
 # API Keys Configuration (यहाँ अपनी Hugging Face और Gemini की API Key सेट करें)
 # ---------------------------------------------------------------------------
-# अपनी Hugging Face की API Key यहाँ स्ट्रिंग में डालें या st.secrets का उपयोग करें:
 HUGGING_FACE_API_KEY = "YAHAN_APNI_HUGGING_FACE_API_KEY_DAALEIN"
 
 
@@ -92,14 +91,10 @@ def generate_with_nano_banana(client, prompt_text: str, aspect_ratio: str, refer
 
 
 # ---------------------------------------------------------------------------
-# Hugging Face Inference API Integration (Image/Video Generation)
+# Hugging Face Inference API Integration
 # ---------------------------------------------------------------------------
 
 def generate_with_huggingface(prompt: str, negative_prompt: str):
-    """
-    Hugging Face API के जरिए हाई-क्वालिटी इमेज जनरेट करने का फंक्शन।
-    यहाँ Stable Diffusion XL या Flux मॉडल का उपयोग किया जा रहा है ताकि चेहरा और बैकग्राउंड साफ़ आएं।
-    """
     global HUGGING_FACE_API_KEY
     if not HUGGING_FACE_API_KEY or HUGGING_FACE_API_KEY == "YAHAN_APNI_HUGGING_FACE_API_KEY_DAALEIN":
         try:
@@ -110,7 +105,6 @@ def generate_with_huggingface(prompt: str, negative_prompt: str):
     if not HUGGING_FACE_API_KEY:
         return None, "Hugging Face API Key missing."
 
-    # बेहतरीन क्वालिटी वाले मॉडल का एंडपॉइंट (FLUX.1-schnell या SDXL)
     API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
     headers = {"Authorization": f"Bearer {HUGGING_FACE_API_KEY}"}
     
@@ -142,7 +136,6 @@ def stable_seed_from_name(name: str, salt: int = 0) -> int:
 
 
 def build_pollinations_url(prompt: str, neg_prompt: str, width: int, height: int, seed: int) -> str:
-    # प्रॉम्प्ट को एन्हांस किया ताकि आँखें, चेहरे और बैकग्राउंड साफ़ आएं
     enhanced_prompt = f"{prompt}, highly detailed sharp focus, clear expressive face, detailed eyes, sharp background, masterpiece"
     encoded_prompt = urllib.parse.quote(enhanced_prompt)
     encoded_neg = urllib.parse.quote(neg_prompt)
@@ -172,7 +165,7 @@ def short_hash(data: bytes) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Main page
+# Main page (बिना किसी अतिरिक्त पैरामीटर के फिक्स किया गया)
 # ---------------------------------------------------------------------------
 
 def render_image_page():
