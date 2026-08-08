@@ -35,7 +35,8 @@ KNOWN_CONFIG_KEYS = {
     "app_title": "App ke header mein dikhne wala title (e.g. '🤖 AI Studio Hub')",
     "dashboard_welcome": "Dashboard page ka welcome heading",
     "dashboard_info_banner": "Dashboard ke top wala info message",
-    "pricing_rules": "Pricing/plan details jo app mein dikhte hain",
+    "pricing_rules": "Pricing/plan details — ye 'Pricing' page mein sabko dikhta hai",
+    "custom_notice": "Koi bhi announcement/notice jo Dashboard ke top pe sabko dikhna chahiye",
     "maintenance_message": "Jab koi feature band ho to users ko dikhne wala message",
 }
 
