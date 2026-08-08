@@ -91,6 +91,7 @@ for flag_key, label in FEATURE_KEYS.items():
         pages.append(label)
     elif admin_user:
         pages.append(f"🚧 {label}")
+pages.append("💳 Pricing")
 pages.append("⚙️ Settings")
 if admin_user:
     pages.append("🛠️ Admin Assistant")
@@ -111,6 +112,10 @@ st.write("---")
 if st.session_state.current_page == "🏠 Dashboard":
     st.subheader(get_config(supabase, "dashboard_welcome", "👋 Welcome to AI Studio Dashboard!"))
     st.info(get_config(supabase, "dashboard_info_banner", "💡 यहाँ से आप कोई भी AI टूल डायरेक्ट ओपन कर सकते हैं।"))
+
+    custom_notice = get_config(supabase, "custom_notice", "")
+    if custom_notice:
+        st.warning(f"📢 {custom_notice}")
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -200,6 +205,10 @@ elif st.session_state.current_page in ("🎬 Image to Video", "🚧 🎬 Image t
     if st.session_state.current_page.startswith("🚧"):
         st.warning(get_config(supabase, "maintenance_message", "🚧 Ye feature abhi maintenance mode mein hai."))
     render_video_page()
+
+elif st.session_state.current_page == "💳 Pricing":
+    st.subheader("💳 Pricing / Plans")
+    st.markdown(get_config(supabase, "pricing_rules", "फ़्री प्लान: रोजाना 10 मैसेज। प्रो प्लान: ₹199/महीना।"))
 
 elif st.session_state.current_page == "⚙️ Settings":
     render_settings_page(supabase)
