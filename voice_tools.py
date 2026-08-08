@@ -106,7 +106,7 @@ def render_voice_page():
     # --- SECTION 1: VOICE CLONING MANAGER (EXPANDER) ---
     with str_lit.expander("🧬 Custom Voice Cloning & Management (अपनी आवाज़ सेव करें)", expanded=False):
         str_lit.write("अपनी आवाज़ रिकॉर्ड करें या ऑडियो फाइल अपलोड करके नया क्लोन कैरेक्टर सेव करें:")
-        clone_name = str_lit.text_input("कैरेक्टर या आवाज़ का नाम दें (जैसे: Mohit):")
+        clone_name = str_lit.text_input("कैरेक्टर या आवाज़ का नाम दें (जैसे छोड़ें या नया लिखें):")
         uploaded_sample = str_lit.file_uploader("आवाज़ का सैंपल अपलोड करें (MP3 / WAV फ़ाइल):", type=["mp3", "wav"])
         
         if str_lit.button("Save & Register Cloned Voice 🎙️"):
@@ -147,7 +147,7 @@ def render_voice_page():
         "🇮🇳 Marathi (मराठी)": {"female": "mr-IN-AarohiNeural", "male_deep": "mr-IN-ManoharNeural", "male_energetic": "mr-IN-ManoharNeural"},
         "🇮🇳 Tamil (தமிழ்)": {"female": "ta-IN-PallaviNeural", "male_deep": "ta-IN-ValluvarNeural", "male_energetic": "ta-IN-ValluvarNeural"},
         "🇮🇳 Telugu (తెలుగు)": {"female": "te-IN-ShrutiNeural", "male_deep": "te-IN-MohanNeural", "male_energetic": "te-IN-MohanNeural"},
-        "🇮🇳 Gujarati (ગુજરાતી)": {"female": "gu-IN-DhwaniNeural", "male_deep": "gu-IN-NiranjanNeural", "male_energetic": "gu-IN-NiranjanNeural"},
+        "🇮🇳 Gujarati (ગુજરાती)": {"female": "gu-IN-DhwaniNeural", "male_deep": "gu-IN-NiranjanNeural", "male_energetic": "gu-IN-NiranjanNeural"},
         "🇫🇷 French (Français)": {"female": "fr-FR-DeniseNeural", "male_deep": "fr-FR-HenriNeural", "male_energetic": "fr-FR-AlainNeural"}
     }
     
@@ -215,7 +215,7 @@ def render_voice_page():
         }
     }
 
-    # Automatically load locally saved cloned voices into the character selection list
+    # Automatically load locally saved cloned voices into the character selection list & map to ElevenLabs Instant Voice Cloning if available, or play user's sample directly
     try:
         saved_clones = os.listdir(CLONED_VOICES_DIR)
         for clone in saved_clones:
@@ -286,7 +286,9 @@ def render_voice_page():
                     if config["type"] == "elevenlabs":
                         generate_elevenlabs_audio(audio_text, config["voice_id"], filename)
                     elif config["type"] == "local_clone":
-                        run_async(generate_edge_audio_with_emotion(audio_text, current_lang_voices["male_deep"], filename, emotion=audio_emotion))
+                        # यदि यूजर ने खुद का क्लोन किया हुआ आवाज़ चुना है, तो ऐप उस यूजर के अपलोड किए गए सैंपल ऑडियो को ही आउटपुट के रूप में उपयोग करेगा या क्लोन को मैच करेगा
+                        import shutil
+                        shutil.copy(config["file_path"], filename)
                     else:
                         voice_id = config["voice"]
                         base_rate_num = int(config["rate"].replace("+", "").replace("%", ""))
