@@ -20,10 +20,10 @@ from image_gen import render_image_page
 from video_gen import render_video_page
 from voice_tools import render_voice_page
 
-# Page Configuration with Custom Logo & Title
+# Page Configuration with Custom Logo & Title (Online link fix for phone icon)
 st.set_page_config(
     page_title="AI Studio Hub",
-    page_icon="logo.png",  # यह आपके नए लोगो को सेट करेगा
+    page_icon="https://i.imgur.com/71Q38xq.png",  
     layout="wide"
 )
 
