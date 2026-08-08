@@ -79,9 +79,6 @@ class StudioAudioEnhancer:
             if not sentence:
                 continue
 
-            if len(sentence.split()) > 5:
-                sentence = f"... (सांस लें) ... {sentence}"
-
             if "डरावना" in emotion or "गंभीर" in emotion:
                 sentence = sentence.replace(",", "...... ").replace("!", "...... ").replace("?", "......... ")
             elif "भावुक" in emotion:
@@ -127,10 +124,28 @@ async def generate_edge_audio_with_emotion(
     rate_str: str = "+0%",
     pitch_str: str = "+0Hz",
     emotion: str = "Normal",
+    max_retries: int = 2,
 ) -> None:
     enhanced_text = StudioAudioEnhancer.apply_smart_pauses_and_breathing(text, emotion)
-    communicate = edge_tts.Communicate(enhanced_text, voice_name, rate=rate_str, pitch=pitch_str)
-    await communicate.save(str(output_file))
+
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            communicate = edge_tts.Communicate(enhanced_text, voice_name, rate=rate_str, pitch=pitch_str)
+            await communicate.save(str(output_file))
+            if output_file.exists() and output_file.stat().st_size > 0:
+                return
+            last_error = RuntimeError("edge-tts returned an empty audio file.")
+        except Exception as e:
+            last_error = e
+            logger.warning("edge-tts attempt %d/%d failed: %s", attempt, max_retries, e)
+        await asyncio.sleep(1)  # brief backoff before retry
+
+    raise RuntimeError(
+        f"edge-tts audio generation failed after {max_retries} attempts: {last_error}. "
+        "Try upgrading the edge-tts package (pip install -U edge-tts) — Microsoft periodically "
+        "changes the backend and older versions stop working."
+    )
 
 
 def generate_elevenlabs_audio(text: str, voice_id: str, output_file: Path) -> None:
