@@ -114,37 +114,36 @@ def get_hf_api_key() -> str:
 
 
 def generate_with_huggingface(prompt: str, negative_prompt: str, max_retries: int = 2):
-    """Returns (image_bytes_or_None, error_message_or_None)."""
+    """
+    Returns (image_bytes_or_None, error_message_or_None).
+    Uses the official huggingface_hub client (handles HF's Inference
+    Providers routing/auth correctly — raw REST calls to the old
+    api-inference.huggingface.co endpoint no longer work).
+    """
     hf_key = get_hf_api_key()
     if not hf_key:
         return None, "HF_API_KEY set nahi hai."
 
-    api_url = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL_ID}"
-    headers = {"Authorization": f"Bearer {hf_key}"}
-    payload = {"inputs": prompt, "parameters": {"num_inference_steps": 4}}  # FLUX.1-schnell is a fast/few-step model
+    try:
+        from huggingface_hub import InferenceClient
+    except ImportError:
+        return None, "huggingface_hub package installed nahi hai (requirements.txt check karo)."
 
     last_error = None
     for attempt in range(max_retries):
         try:
-            response = requests.post(api_url, headers=headers, json=payload, timeout=90)
-
-            if response.status_code == 200 and len(response.content) > 1000:
-                return response.content, None
-
-            if response.status_code == 503:
-                # Model is cold-starting on HF's servers — wait for the estimated time and retry once
-                try:
-                    wait_s = min(response.json().get("estimated_time", 20), 40)
-                except Exception:
-                    wait_s = 20
-                last_error = f"Model load ho raha hai (cold start), {wait_s:.0f}s wait kar rahe hain..."
-                time.sleep(wait_s)
-                continue
-
-            last_error = f"HF API Error {response.status_code}: {response.text[:200]}"
-        except requests.RequestException as e:
-            last_error = str(e)
-        time.sleep(2)
+            client = InferenceClient(provider="auto", api_key=hf_key)
+            pil_image = client.text_to_image(prompt, model=HF_MODEL_ID)
+            buf = BytesIO()
+            pil_image.save(buf, format="PNG")
+            data = buf.getvalue()
+            if len(data) > 1000:
+                return data, None
+            last_error = "Response mila lekin image data khali tha."
+        except Exception as e:
+            last_error = f"{type(e).__name__}: {e}"
+            logger.warning("HF attempt %d failed: %s", attempt + 1, last_error)
+            time.sleep(3)
 
     return None, last_error
 
@@ -159,7 +158,11 @@ def stable_seed_from_name(name: str, salt: int = 0) -> int:
 
 
 def build_pollinations_url(prompt: str, neg_prompt: str, width: int, height: int, seed: int) -> str:
-    enhanced_prompt = f"{prompt}, highly detailed sharp focus, clear expressive face, detailed eyes, sharp background, masterpiece"
+    enhanced_prompt = (
+        f"{prompt}, professional photography quality, natural skin texture, symmetrical detailed face, "
+        f"sharp expressive eyes, well-lit clear background, cinematic lighting, photorealistic detail, "
+        f"8k uhd, high dynamic range, crisp focus throughout, masterpiece composition"
+    )
     encoded_prompt = urllib.parse.quote(enhanced_prompt)
     encoded_neg = urllib.parse.quote(neg_prompt)
     return (
@@ -274,7 +277,7 @@ def render_image_page(supabase=None, user=None):
 
     neg_prompt = st.text_area(
         "🚫 Negative Prompt (चेहरा, आँखें और बैकग्राउंड साफ़ रखने के लिए):",
-        value="blurry, distorted face, low quality, bad anatomy, dark shadows, ugly, extra limbs, deformed hands, out of focus background",
+        value="blurry, distorted face, asymmetrical face, low quality, bad anatomy, dark shadows, ugly, extra limbs, deformed hands, extra fingers, out of focus background, grainy, watermark, text, oversaturated",
     )
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
@@ -312,7 +315,7 @@ def render_image_page(supabase=None, user=None):
             return
 
         with st.spinner("🖼️ इमेज बन रही है... (कृपया प्रतीक्षा करें, HD/Ultra HD mein zyada time lag sakta hai)"):
-            free_boost = "extremely detailed sharp faces, clear eyes, crisp background, vibrant colors, masterwork, ultra high resolution"
+            free_boost = "extremely detailed sharp face with natural skin texture, symmetrical features, clear expressive eyes, crisp well-lit background, cinematic lighting, vibrant colors, masterwork, ultra high resolution, photorealistic detail"
             style_tags_map = {
                 "Indian Storybook Illustration (बेस्ट)": f"classic Indian storybook illustration, beautifully drawn characters and clear detailed room background, {free_boost}",
                 "2D Animation / Cartoon": f"professional 2d animation cell, clean sharp outlines, vibrant lighting, {free_boost}",
