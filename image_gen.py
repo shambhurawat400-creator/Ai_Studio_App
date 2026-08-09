@@ -180,15 +180,11 @@ def stable_seed_from_name(name: str, salt: int = 0) -> int:
 
 
 def build_pollinations_url(prompt: str, neg_prompt: str, width: int, height: int, seed: int) -> str:
-    enhanced_prompt = (
-        f"{prompt}, professional photography quality, natural skin texture, symmetrical detailed face, "
-        f"sharp expressive eyes, well-lit clear background, cinematic lighting, professional color grading, "
-        f"photorealistic detail, depth of field, 8k uhd, high dynamic range, crisp focus throughout, "
-        f"award winning masterpiece composition"
-    )
-    encoded_prompt = urllib.parse.quote(enhanced_prompt)
+    # Note: `prompt` already includes style/quality tags from the caller — don't add more here,
+    # since a bloated prompt dilutes attention on the specific scene (characters, count, setting)
+    # and free models like this one have weaker prompt adherence to begin with.
+    encoded_prompt = urllib.parse.quote(prompt)
     encoded_neg = urllib.parse.quote(neg_prompt)
-    # Nudge resolution up a bit within the same aspect ratio for a sharper base render
     boosted_width = min(int(width * 1.15), MAX_DIMENSION)
     boosted_height = min(int(height * 1.15), MAX_DIMENSION)
     return (
@@ -312,6 +308,7 @@ def render_image_page(supabase=None, user=None):
         "🚫 Negative Prompt (चेहरा, आँखें और बैकग्राउंड साफ़ रखने के लिए):",
         value="blurry, distorted face, asymmetrical face, low quality, bad anatomy, dark shadows, ugly, extra limbs, deformed hands, extra fingers, out of focus background, grainy, watermark, text, oversaturated",
     )
+    st.caption("💡 Tip: Free (Pollinations) model naamon (Rahul, Sonu, etc.) se zyada 'count' follow karta hai — jaise 'four teenage boys' likhna 'Rahul, Mohan, Sonu aur Deepak' se zyada reliably 4 log dikhayega.")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
@@ -348,13 +345,13 @@ def render_image_page(supabase=None, user=None):
             return
 
         with st.spinner("🖼️ इमेज बन रही है... (कृपया प्रतीक्षा करें, HD/Ultra HD mein zyada time lag sakta hai)"):
-            free_boost = "extremely detailed sharp face with natural skin texture, symmetrical features, clear expressive eyes, crisp well-lit background, cinematic lighting, vibrant colors, masterwork, ultra high resolution, photorealistic detail"
+            free_boost = "sharp detailed faces, clean background, vibrant colors, high quality"
             style_tags_map = {
-                "Indian Storybook Illustration (बेस्ट)": f"classic Indian storybook illustration, beautifully drawn characters and clear detailed room background, {free_boost}",
-                "2D Animation / Cartoon": f"professional 2d animation cell, clean sharp outlines, vibrant lighting, {free_boost}",
-                "Cinematic Story Frame": f"cinematic story frame, warm sharp ambient lighting, highly detailed background, {free_boost}",
-                "Classic Oil Painting": f"classic oil painting on canvas, rich textured brushwork, masterpiece, {free_boost}",
-                "Watercolor Art": f"soft watercolor painting style, artistic brush strokes, clear background, {free_boost}",
+                "Indian Storybook Illustration (बेस्ट)": f"Indian storybook illustration style, {free_boost}",
+                "2D Animation / Cartoon": f"2d animation cartoon style, clean outlines, {free_boost}",
+                "Cinematic Story Frame": f"cinematic frame, warm ambient lighting, {free_boost}",
+                "Classic Oil Painting": f"oil painting style, textured brushwork, {free_boost}",
+                "Watercolor Art": f"watercolor painting style, soft brush strokes, {free_boost}",
             }
             current_style_tag = style_tags_map.get(style_option, free_boost)
 
