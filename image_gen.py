@@ -119,7 +119,7 @@ def generate_with_huggingface(prompt: str, negative_prompt: str, max_retries: in
     if not hf_key:
         return None, "HF_API_KEY set nahi hai."
 
-    api_url = f"https://api-inference.huggingface.co/models/{HF_MODEL_ID}"
+    api_url = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL_ID}"
     headers = {"Authorization": f"Bearer {hf_key}"}
     payload = {"inputs": prompt, "parameters": {"num_inference_steps": 4}}  # FLUX.1-schnell is a fast/few-step model
 
