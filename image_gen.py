@@ -35,7 +35,11 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 NANO_BANANA_MODEL_CANDIDATES = ["gemini-2.5-flash-image", "gemini-2.5-flash-image-preview"]
-HF_MODEL_ID = "black-forest-labs/FLUX.1-schnell"  # close to Nano Banana/ChatGPT quality, free with an HF token
+HF_MODEL_OPTIONS = {
+    "⚡ Fast (FLUX.1-schnell)": "black-forest-labs/FLUX.1-schnell",
+    "💎 Best Quality (FLUX.1-dev — thoda slow)": "black-forest-labs/FLUX.1-dev",
+}
+HF_MODEL_ID = HF_MODEL_OPTIONS["⚡ Fast (FLUX.1-schnell)"]  # default
 MAX_DIMENSION = 2048
 
 
@@ -113,7 +117,7 @@ def get_hf_api_key() -> str:
     return key
 
 
-def generate_with_huggingface(prompt: str, negative_prompt: str, max_retries: int = 2):
+def generate_with_huggingface(prompt: str, negative_prompt: str, model_id: str, width: int, height: int, max_retries: int = 2):
     """
     Returns (image_bytes_or_None, error_message_or_None).
     Uses the official huggingface_hub client (handles HF's Inference
@@ -129,11 +133,27 @@ def generate_with_huggingface(prompt: str, negative_prompt: str, max_retries: in
     except ImportError:
         return None, "huggingface_hub package installed nahi hai (requirements.txt check karo)."
 
+    is_dev_model = "dev" in model_id.lower()
+    kwargs_full = {
+        "negative_prompt": negative_prompt,
+        "width": min(width, 1536),
+        "height": min(height, 1536),
+    }
+    if is_dev_model:
+        kwargs_full["num_inference_steps"] = 30
+        kwargs_full["guidance_scale"] = 3.5
+    else:
+        kwargs_full["num_inference_steps"] = 4  # schnell is tuned for very few steps
+
     last_error = None
     for attempt in range(max_retries):
         try:
             client = InferenceClient(provider="auto", api_key=hf_key)
-            pil_image = client.text_to_image(prompt, model=HF_MODEL_ID)
+            try:
+                pil_image = client.text_to_image(prompt, model=model_id, **kwargs_full)
+            except TypeError:
+                # Some providers don't accept all kwargs — fall back to just prompt+model
+                pil_image = client.text_to_image(prompt, model=model_id)
             buf = BytesIO()
             pil_image.save(buf, format="PNG")
             data = buf.getvalue()
@@ -142,6 +162,8 @@ def generate_with_huggingface(prompt: str, negative_prompt: str, max_retries: in
             last_error = "Response mila lekin image data khali tha."
         except Exception as e:
             last_error = f"{type(e).__name__}: {e}"
+            if "gated" in str(e).lower() or "403" in str(e):
+                last_error += " — FLUX.1-dev ek gated model hai, pehle huggingface.co par model page pe jaake license accept karo."
             logger.warning("HF attempt %d failed: %s", attempt + 1, last_error)
             time.sleep(3)
 
@@ -160,14 +182,18 @@ def stable_seed_from_name(name: str, salt: int = 0) -> int:
 def build_pollinations_url(prompt: str, neg_prompt: str, width: int, height: int, seed: int) -> str:
     enhanced_prompt = (
         f"{prompt}, professional photography quality, natural skin texture, symmetrical detailed face, "
-        f"sharp expressive eyes, well-lit clear background, cinematic lighting, photorealistic detail, "
-        f"8k uhd, high dynamic range, crisp focus throughout, masterpiece composition"
+        f"sharp expressive eyes, well-lit clear background, cinematic lighting, professional color grading, "
+        f"photorealistic detail, depth of field, 8k uhd, high dynamic range, crisp focus throughout, "
+        f"award winning masterpiece composition"
     )
     encoded_prompt = urllib.parse.quote(enhanced_prompt)
     encoded_neg = urllib.parse.quote(neg_prompt)
+    # Nudge resolution up a bit within the same aspect ratio for a sharper base render
+    boosted_width = min(int(width * 1.15), MAX_DIMENSION)
+    boosted_height = min(int(height * 1.15), MAX_DIMENSION)
     return (
         f"https://image.pollinations.ai/prompt/{encoded_prompt}"
-        f"?width={width}&height={height}&seed={seed}&model=flux&nologo=true&enhance=true&negative={encoded_neg}"
+        f"?width={boosted_width}&height={boosted_height}&seed={seed}&model=flux&nologo=true&enhance=true&negative={encoded_neg}"
     )
 
 
@@ -224,6 +250,13 @@ def render_image_page(supabase=None, user=None):
         [PROVIDER_AUTO, PROVIDER_NANO, PROVIDER_HF, PROVIDER_POLLINATIONS],
         horizontal=False,
     )
+
+    hf_model_choice = HF_MODEL_OPTIONS["⚡ Fast (FLUX.1-schnell)"]
+    if provider_choice in (PROVIDER_AUTO, PROVIDER_HF) and hf_available:
+        hf_quality_label = st.selectbox("🧠 Hugging Face Quality:", list(HF_MODEL_OPTIONS.keys()))
+        hf_model_choice = HF_MODEL_OPTIONS[hf_quality_label]
+        if "dev" in hf_model_choice.lower():
+            st.caption("⚠️ FLUX.1-dev gated hai — pehli baar use karne se pehle [model page](https://huggingface.co/black-forest-labs/FLUX.1-dev) पर jaake license ek baar accept karna hoga.")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
@@ -378,7 +411,7 @@ def render_image_page(supabase=None, user=None):
                                 character["reference_image"] = img_bytes
 
                     elif step == "huggingface":
-                        img_bytes, err_msg = generate_with_huggingface(final_prompt, final_neg)
+                        img_bytes, err_msg = generate_with_huggingface(final_prompt, final_neg, hf_model_choice, fallback_width, fallback_height)
                         if img_bytes:
                             provider = "Hugging Face (FLUX)"
 
