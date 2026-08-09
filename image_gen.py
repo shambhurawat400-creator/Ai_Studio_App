@@ -119,55 +119,63 @@ def get_hf_api_key() -> str:
 
 def generate_with_huggingface(prompt: str, negative_prompt: str, model_id: str, width: int, height: int, max_retries: int = 2):
     """
-    Returns (image_bytes_or_None, error_message_or_None).
+    Returns (image_bytes_or_None, error_message_or_None, model_actually_used_or_None).
     Uses the official huggingface_hub client (handles HF's Inference
     Providers routing/auth correctly — raw REST calls to the old
     api-inference.huggingface.co endpoint no longer work).
+    If the requested model is gated/inaccessible, automatically falls back
+    to FLUX.1-schnell (ungated) so the user doesn't hit a hard failure.
     """
     hf_key = get_hf_api_key()
     if not hf_key:
-        return None, "HF_API_KEY set nahi hai."
+        return None, "HF_API_KEY set nahi hai.", None
 
     try:
         from huggingface_hub import InferenceClient
     except ImportError:
-        return None, "huggingface_hub package installed nahi hai (requirements.txt check karo)."
+        return None, "huggingface_hub package installed nahi hai (requirements.txt check karo).", None
 
-    is_dev_model = "dev" in model_id.lower()
-    kwargs_full = {
-        "negative_prompt": negative_prompt,
-        "width": min(width, 1536),
-        "height": min(height, 1536),
-    }
-    if is_dev_model:
-        kwargs_full["num_inference_steps"] = 30
-        kwargs_full["guidance_scale"] = 3.5
-    else:
-        kwargs_full["num_inference_steps"] = 4  # schnell is tuned for very few steps
+    models_to_try = [model_id]
+    fallback_id = HF_MODEL_OPTIONS["⚡ Fast (FLUX.1-schnell)"]
+    if model_id != fallback_id:
+        models_to_try.append(fallback_id)
 
     last_error = None
-    for attempt in range(max_retries):
-        try:
-            client = InferenceClient(provider="auto", api_key=hf_key)
-            try:
-                pil_image = client.text_to_image(prompt, model=model_id, **kwargs_full)
-            except TypeError:
-                # Some providers don't accept all kwargs — fall back to just prompt+model
-                pil_image = client.text_to_image(prompt, model=model_id)
-            buf = BytesIO()
-            pil_image.save(buf, format="PNG")
-            data = buf.getvalue()
-            if len(data) > 1000:
-                return data, None
-            last_error = "Response mila lekin image data khali tha."
-        except Exception as e:
-            last_error = f"{type(e).__name__}: {e}"
-            if "gated" in str(e).lower() or "403" in str(e):
-                last_error += " — FLUX.1-dev ek gated model hai, pehle huggingface.co par model page pe jaake license accept karo."
-            logger.warning("HF attempt %d failed: %s", attempt + 1, last_error)
-            time.sleep(3)
+    for try_model in models_to_try:
+        is_dev_model = "dev" in try_model.lower()
+        kwargs_full = {
+            "negative_prompt": negative_prompt,
+            "width": min(width, 1536),
+            "height": min(height, 1536),
+        }
+        if is_dev_model:
+            kwargs_full["num_inference_steps"] = 30
+            kwargs_full["guidance_scale"] = 3.5
+        else:
+            kwargs_full["num_inference_steps"] = 4
 
-    return None, last_error
+        for attempt in range(max_retries):
+            try:
+                client = InferenceClient(provider="auto", api_key=hf_key)
+                try:
+                    pil_image = client.text_to_image(prompt, model=try_model, **kwargs_full)
+                except TypeError:
+                    pil_image = client.text_to_image(prompt, model=try_model)
+                buf = BytesIO()
+                pil_image.save(buf, format="PNG")
+                data = buf.getvalue()
+                if len(data) > 1000:
+                    return data, None, try_model
+                last_error = "Response mila lekin image data khali tha."
+            except Exception as e:
+                last_error = f"[{try_model}] {type(e).__name__}: {e}"
+                is_access_error = any(s in str(e).lower() for s in ["gated", "403", "not authorized", "access"])
+                logger.warning("HF attempt failed: %s", last_error)
+                if is_access_error:
+                    break  # don't retry the same gated model, move to fallback model immediately
+                time.sleep(3)
+
+    return None, last_error, None
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +197,7 @@ def build_pollinations_url(prompt: str, neg_prompt: str, width: int, height: int
     boosted_height = min(int(height * 1.15), MAX_DIMENSION)
     return (
         f"https://image.pollinations.ai/prompt/{encoded_prompt}"
-        f"?width={boosted_width}&height={boosted_height}&seed={seed}&model=flux&nologo=true&enhance=true&negative={encoded_neg}"
+        f"?width={boosted_width}&height={boosted_height}&seed={seed}&model=flux&nologo=true&negative={encoded_neg}"
     )
 
 
@@ -364,12 +372,11 @@ def render_image_page(supabase=None, user=None):
                 character = next((c for c in st.session_state.characters if c["name"] == selected_character_name), None)
 
             clean_input = img_prompt.strip()
-            prompt_parts = [clean_input]
+            prompt_parts = ["Front-facing camera shot, all characters facing toward the viewer with clearly visible faces (not walking away, not a back view, not a silhouette)", clean_input]
             if character:
                 prompt_parts.append(f"the main character must match this description exactly: {character['description']}")
                 if character.get("reference_image"):
                     prompt_parts.append("keep the character's face, hairstyle and outfit consistent with the provided reference image")
-            prompt_parts.append("all characters facing forward toward the camera with clearly visible faces and expressions, front-view composition, not a back view")
             prompt_parts.append(f"aspect ratio {aspect_ratio_str}")
             prompt_parts.append(current_style_tag)
             final_prompt = ", ".join(prompt_parts)
@@ -413,9 +420,11 @@ def render_image_page(supabase=None, user=None):
                                 character["reference_image"] = img_bytes
 
                     elif step == "huggingface":
-                        img_bytes, err_msg = generate_with_huggingface(final_prompt, final_neg, hf_model_choice, fallback_width, fallback_height)
+                        img_bytes, err_msg, model_used = generate_with_huggingface(final_prompt, final_neg, hf_model_choice, fallback_width, fallback_height)
                         if img_bytes:
                             provider = "Hugging Face (FLUX)"
+                            if model_used and "dev" not in model_used.lower() and "dev" in hf_model_choice.lower():
+                                provider += " — schnell pe auto-fallback (dev accessible nahi tha)"
 
                     elif step == "pollinations":
                         seed_val = stable_seed_from_name(selected_character_name, salt=i) if character else datetime.now().microsecond + i
