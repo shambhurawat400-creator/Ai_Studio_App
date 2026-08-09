@@ -16,6 +16,7 @@ read only from st.secrets / environment variables.
 import hashlib
 import logging
 import os
+import base64
 import time
 import urllib.parse
 from datetime import datetime
@@ -218,6 +219,49 @@ def fetch_image_bytes(url: str, timeout: float = 90.0, max_retries: int = 2):
 
 def short_hash(data: bytes) -> str:
     return hashlib.md5(data).hexdigest()[:10]
+
+
+# ---------------------------------------------------------------------------
+# Persistent saved projects (Supabase-backed, per user — survives reloads/logins)
+# ---------------------------------------------------------------------------
+
+def save_project_to_supabase(supabase, user, prompt: str, character: str, style: str, img_bytes: bytes) -> bool:
+    try:
+        supabase.table("saved_image_projects").insert({
+            "user_id": user.id,
+            "prompt": prompt,
+            "character": character,
+            "style": style,
+            "image_b64": base64.b64encode(img_bytes).decode("utf-8"),
+        }).execute()
+        return True
+    except Exception as e:
+        st.error(
+            f"🚨 Save nahi ho paya: {e}\n\n"
+            "Supabase mein `saved_image_projects` table honi chahiye (SQL neeche di hai)."
+        )
+        return False
+
+
+def load_saved_projects_from_supabase(supabase, user) -> list:
+    try:
+        res = supabase.table("saved_image_projects").select("*").eq("user_id", user.id).order("created_at", desc=True).execute()
+        projects = []
+        for row in res.data:
+            try:
+                img_bytes = base64.b64decode(row["image_b64"])
+                projects.append({
+                    "prompt": row.get("prompt", ""),
+                    "character": row.get("character", "—"),
+                    "style": row.get("style", ""),
+                    "image": img_bytes,
+                })
+            except Exception:
+                continue
+        return projects
+    except Exception as e:
+        logger.info("Could not load saved_image_projects (table may not exist yet): %s", e)
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -462,13 +506,17 @@ def render_image_page(supabase=None, user=None):
                             key=f"download_{idx}_{h}",
                         )
                         if st.button(f"💾 Save Project #{idx + 1}", key=f"save_{idx}_{h}"):
-                            st.session_state.saved_projects.append({
-                                "prompt": img_prompt,
-                                "character": selected_character_name,
-                                "style": style_option,
-                                "image": img_bytes,
-                            })
-                            st.success("📁 प्रोजेक्ट सफलतापूर्वक सेव हो गया!")
+                            if supabase and user:
+                                if save_project_to_supabase(supabase, user, img_prompt, selected_character_name, style_option, img_bytes):
+                                    st.success("📁 प्रोजेक्ट permanently सेव हो गया — ye अगली बार login karne par bhi dikhega!")
+                            else:
+                                st.session_state.saved_projects.append({
+                                    "prompt": img_prompt,
+                                    "character": selected_character_name,
+                                    "style": style_option,
+                                    "image": img_bytes,
+                                })
+                                st.success("📁 प्रोजेक्ट सेव हो गया (is session ke liye).")
                     else:
                         st.warning(f"⚠️ Image #{idx + 1} generate नहीं हो पाई।")
                         if err_msg:
@@ -491,8 +539,9 @@ def render_image_page(supabase=None, user=None):
 
     with tab1:
         st.subheader("आपके सेव किए गए प्रोजेक्ट्स")
-        if st.session_state.saved_projects:
-            for p_idx, proj in enumerate(st.session_state.saved_projects):
+        projects_to_show = load_saved_projects_from_supabase(supabase, user) if (supabase and user) else st.session_state.saved_projects
+        if projects_to_show:
+            for p_idx, proj in enumerate(projects_to_show):
                 st.write(f"**{p_idx + 1}. Style:** {proj['style']} | **Character:** {proj.get('character', '—')} | **Prompt:** {proj['prompt']}")
                 st.image(proj["image"], width=300)
                 st.write("---")
