@@ -317,7 +317,7 @@ def render_image_page(supabase=None, user=None):
 
     neg_prompt = st.text_area(
         "🚫 Negative Prompt (चेहरा, आँखें और बैकग्राउंड साफ़ रखने के लिए):",
-        value="blurry, distorted face, asymmetrical face, low quality, bad anatomy, dark shadows, ugly, extra limbs, deformed hands, extra fingers, out of focus background, grainy, watermark, text, oversaturated, back view, from behind, faces hidden, looking away, silhouette",
+        value="blurry, distorted face, asymmetrical face, low quality, bad anatomy, dark shadows, ugly, extra limbs, deformed hands, extra fingers, out of focus background, grainy, watermark, text, oversaturated, back view, from behind, rear view, back of head, turned away, faces hidden, looking away, walking away from camera, silhouette",
     )
     st.caption("💡 Tip 1: 'four teenage boys' jaisa count likhna naamon (Rahul, Sonu...) se zyada reliably सही number of log dikhayega.")
     st.caption("💡 Tip 2: Hugging Face mein complex/multi-character scenes ke liye 'Best Quality (FLUX.1-dev)' chuno — 'Fast (schnell)' speed ke liye bana hai, detailed instructions utni achhi tarah follow nahi karta.")
@@ -357,7 +357,7 @@ def render_image_page(supabase=None, user=None):
             return
 
         with st.spinner("🖼️ इमेज बन रही है... (कृपया प्रतीक्षा करें, HD/Ultra HD mein zyada time lag sakta hai)"):
-            free_boost = "sharp detailed faces, clean background, vibrant colors, high quality"
+            free_boost = "close-up detailed eyes with visible iris and catchlights, sharp detailed facial features, clean background, vibrant colors, high quality"
             style_tags_map = {
                 "Indian Storybook Illustration (बेस्ट)": f"Indian storybook illustration style, {free_boost}",
                 "2D Animation / Cartoon": f"2d animation cartoon style, clean outlines, {free_boost}",
@@ -372,7 +372,10 @@ def render_image_page(supabase=None, user=None):
                 character = next((c for c in st.session_state.characters if c["name"] == selected_character_name), None)
 
             clean_input = img_prompt.strip()
-            prompt_parts = ["Front-facing camera shot, all characters facing toward the viewer with clearly visible faces (not walking away, not a back view, not a silhouette)", clean_input]
+            prompt_parts = [
+                "cinematic movie poster style, posed group portrait, everyone standing together looking directly at the camera with clear detailed faces, front view, direct eye contact with viewer (not walking away, not a back view, not rear view, not turned away)",
+                clean_input,
+            ]
             if character:
                 prompt_parts.append(f"the main character must match this description exactly: {character['description']}")
                 if character.get("reference_image"):
