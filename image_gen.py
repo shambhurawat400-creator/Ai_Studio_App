@@ -249,7 +249,10 @@ def render_image_page(supabase=None, user=None):
 
     hf_model_choice = HF_MODEL_OPTIONS["⚡ Fast (FLUX.1-schnell)"]
     if provider_choice in (PROVIDER_AUTO, PROVIDER_HF) and hf_available:
-        hf_quality_label = st.selectbox("🧠 Hugging Face Quality:", list(HF_MODEL_OPTIONS.keys()))
+        hf_quality_label = st.selectbox(
+            "🧠 Hugging Face Quality:", list(HF_MODEL_OPTIONS.keys()),
+            index=1, help="Best Quality (dev) prompts ko zyada sahi follow karta hai, khaas kar multiple characters wali scenes mein.",
+        )
         hf_model_choice = HF_MODEL_OPTIONS[hf_quality_label]
         if "dev" in hf_model_choice.lower():
             st.caption("⚠️ FLUX.1-dev gated hai — pehli baar use karne se pehle [model page](https://huggingface.co/black-forest-labs/FLUX.1-dev) पर jaake license ek baar accept karna hoga.")
@@ -306,9 +309,10 @@ def render_image_page(supabase=None, user=None):
 
     neg_prompt = st.text_area(
         "🚫 Negative Prompt (चेहरा, आँखें और बैकग्राउंड साफ़ रखने के लिए):",
-        value="blurry, distorted face, asymmetrical face, low quality, bad anatomy, dark shadows, ugly, extra limbs, deformed hands, extra fingers, out of focus background, grainy, watermark, text, oversaturated",
+        value="blurry, distorted face, asymmetrical face, low quality, bad anatomy, dark shadows, ugly, extra limbs, deformed hands, extra fingers, out of focus background, grainy, watermark, text, oversaturated, back view, from behind, faces hidden, looking away, silhouette",
     )
-    st.caption("💡 Tip: Free (Pollinations) model naamon (Rahul, Sonu, etc.) se zyada 'count' follow karta hai — jaise 'four teenage boys' likhna 'Rahul, Mohan, Sonu aur Deepak' se zyada reliably 4 log dikhayega.")
+    st.caption("💡 Tip 1: 'four teenage boys' jaisa count likhna naamon (Rahul, Sonu...) se zyada reliably सही number of log dikhayega.")
+    st.caption("💡 Tip 2: Hugging Face mein complex/multi-character scenes ke liye 'Best Quality (FLUX.1-dev)' chuno — 'Fast (schnell)' speed ke liye bana hai, detailed instructions utni achhi tarah follow nahi karta.")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
@@ -365,6 +369,7 @@ def render_image_page(supabase=None, user=None):
                 prompt_parts.append(f"the main character must match this description exactly: {character['description']}")
                 if character.get("reference_image"):
                     prompt_parts.append("keep the character's face, hairstyle and outfit consistent with the provided reference image")
+            prompt_parts.append("all characters facing forward toward the camera with clearly visible faces and expressions, front-view composition, not a back view")
             prompt_parts.append(f"aspect ratio {aspect_ratio_str}")
             prompt_parts.append(current_style_tag)
             final_prompt = ", ".join(prompt_parts)
