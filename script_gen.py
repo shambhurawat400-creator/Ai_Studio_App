@@ -1,11 +1,9 @@
 """
-AI Video & Story Script Writer & Chatbot Hub (Pro Version)
-------------------------------------------------------------
-Production-hardened rewrite:
-- No hardcoded API key (env var / st.secrets only)
-- Cached Groq client (not rebuilt on every rerun)
-- Strict instruction-following: system prompt + optional custom
-  instructions box, so the model sticks to exactly what you ask for
+AI Video & Story Script Writer & Chatbot Hub (Pro Version with Groq & GitHub Fallback)
+------------------------------------------------------------------------------------
+- Dual AI Providers: Primary Groq with automatic Fallback to GitHub Models API
+- Cached clients (not rebuilt on every rerun)
+- Strict instruction-following: system prompt + optional custom instructions
 - Retry logic for transient API failures
 - Sanitized filenames for downloads
 - Chat history trimmed to avoid unbounded token growth
@@ -17,26 +15,24 @@ import logging
 
 import streamlit as st
 from groq import Groq
+from openai import OpenAI  # GitHub Models OpenAI compatible client ke liye
 
 logger = logging.getLogger(__name__)
 
 MODEL_NAME = "llama-3.1-8b-instant"
+GITHUB_MODEL_NAME = "gpt-4o-mini"  # GitHub Models par available standard fast model
 MAX_CHAT_HISTORY_MESSAGES = 20  # keep last N messages so context doesn't grow unbounded
 MAX_RETRIES = 2
 
 
 # ---------------------------------------------------------------------------
-# Client setup
+# Client setup (Groq & GitHub Fallback)
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
 def get_groq_client() -> Groq | None:
-    """
-    Build the Groq client once per session. API key must come from
-    st.secrets or the GROQ_API_KEY environment variable — never hardcode it.
-    """
+    """Build the Groq client once per session."""
     import os
-
     api_key = None
     try:
         api_key = st.secrets.get("GROQ_API_KEY")
@@ -55,17 +51,75 @@ def get_groq_client() -> Groq | None:
         return None
 
 
-def call_groq_with_retry(client: Groq, **kwargs):
-    """Call the chat completion endpoint with a couple of retries on transient errors."""
+@st.cache_resource(show_spinner=False)
+def get_github_client() -> OpenAI | None:
+    """Build the GitHub Models client as a fallback option."""
+    import os
+    token = None
+    try:
+        token = st.secrets.get("GITHUB_TOKEN")
+    except Exception:
+        pass
+    if not token:
+        token = os.environ.get("GITHUB_TOKEN")
+
+    if not token:
+        return None
+
+    try:
+        # GitHub Models OpenAI-compatible endpoint use karta hai
+        return OpenAI(
+            base_url="https://models.inference.ai.azure.com",
+            api_key=token
+        )
+    except Exception as e:
+        logger.error("Failed to initialize GitHub client: %s", e)
+        return None
+
+
+def call_ai_with_fallback(groq_client, messages, max_tokens=4000, temperature=0.7):
+    """
+    Pehle Groq se call karne ki koshish karega. Agar Groq fail hota hai 
+    ya limit khatam hoti hai, toh automatically GitHub Models API par switch ho jayega.
+    """
+    github_client = get_github_client()
     last_error = None
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            return client.chat.completions.create(**kwargs)
-        except Exception as e:
-            last_error = e
-            logger.warning("Groq call attempt %d/%d failed: %s", attempt, MAX_RETRIES, e)
-            time.sleep(1.5)
-    raise last_error
+
+    # 1. Try Groq First
+    if groq_client:
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                response = groq_client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature
+                )
+                return response, "Groq"
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Groq attempt {attempt} failed: {e}")
+                time.sleep(1.0)
+
+    # 2. Fallback to GitHub Models if Groq fails or unavailable
+    if github_client:
+        logger.info("Switching to GitHub Models API fallback...")
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                response = github_client.chat.completions.create(
+                    model=GITHUB_MODEL_NAME,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature
+                )
+                return response, "GitHub Models"
+            except Exception as e:
+                last_error = e
+                logger.warning(f"GitHub fallback attempt {attempt} failed: {e}")
+                time.sleep(1.0)
+
+    # Agar dono fail ho jayein
+    raise RuntimeError(f"All AI providers failed. Last error: {str(last_error)}")
 
 
 def sanitize_filename(text: str) -> str:
@@ -81,16 +135,18 @@ def render_script_page(groq_client=None):
     st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए स्क्रिप्ट तैयार कर सकते हैं और AI चैटबॉट से बात कर सकते हैं:")
 
-    active_client = groq_client or get_groq_client()
-    if not active_client:
-        st.error("🚨 GROQ_API_KEY सेट नहीं है। `.streamlit/secrets.toml` में या environment variable के रूप में सेट करें।")
+    active_groq = groq_client or get_groq_client()
+    github_client_check = get_github_client()
+
+    if not active_groq and not github_client_check:
+        st.error("🚨 ना तो GROQ_API_KEY सेट है और ना ही GITHUB_TOKEN! कृपया secrets.toml में कम से कम एक की ज़रूर सेट करें।")
 
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
 
     if app_mode == "✍️ Pro Script Writer":
-        _render_script_writer(active_client)
+        _render_script_writer(active_groq)
     else:
-        _render_chatbot(active_client)
+        _render_chatbot(active_groq)
 
 
 # ---------------------------------------------------------------------------
@@ -98,11 +154,6 @@ def render_script_page(groq_client=None):
 # ---------------------------------------------------------------------------
 
 def _build_system_prompt(script_type: str, tone_style: str, extra_instructions: str) -> str:
-    """
-    A single, strict system prompt shared across all parts, so the model
-    stays on-topic and follows exactly what the user asked — nothing added,
-    nothing skipped.
-    """
     base = (
         "You are a world-class professional scriptwriter. "
         "Follow the user's instructions with strict precision. "
@@ -118,7 +169,7 @@ def _build_system_prompt(script_type: str, tone_style: str, extra_instructions: 
     return base
 
 
-def _render_script_writer(active_client):
+def _render_script_writer(active_groq):
     topic = st.text_input(
         "स्क्रिप्ट का टॉपिक/विषय दर्ज करें:",
         placeholder="जैसे: Horror story near a haunted well in an ancient village",
@@ -156,8 +207,8 @@ def _render_script_writer(active_client):
         if not topic.strip():
             st.warning("कृपया पहले टॉपिक दर्ज करें!")
             return
-        if not active_client:
-            st.error("🚨 API Key कनेक्ट नहीं हो पाई है!")
+        if not active_groq and not get_github_client():
+            st.error("🚨 कोई भी AI Client उपलब्ध नहीं है!")
             return
 
         with st.spinner("प्रो AI डायरेक्टर स्क्रिप्ट, विजुअल क्यूज और डायलॉग तैयार कर रहा है..."):
@@ -172,6 +223,7 @@ def _render_script_writer(active_client):
                 system_prompt = _build_system_prompt(script_type, tone_style, extra_instructions)
                 full_script = ""
                 previous_context = ""
+                used_provider = ""
 
                 for i in range(1, parts + 1):
                     if parts > 1:
@@ -188,16 +240,13 @@ def _render_script_writer(active_client):
                             "Include a strong hook at the start."
                         )
 
-                    response = call_groq_with_retry(
-                        active_client,
-                        model=MODEL_NAME,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                        max_tokens=4000,
-                        temperature=0.8,
-                    )
+                    messages = [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ]
+
+                    response, provider = call_ai_with_fallback(active_groq, messages, max_tokens=4000, temperature=0.8)
+                    used_provider = provider
 
                     part_content = response.choices[0].message.content
                     if not part_content or not part_content.strip():
@@ -206,6 +255,7 @@ def _render_script_writer(active_client):
                     full_script += f"\n\n==================== [ सीन / भाग {i} ] ====================\n\n" + part_content
                     previous_context = part_content
 
+                st.success(f"✨ स्क्रिप्ट सफलतापूर्वक तैयार है! (Powered by: {used_provider})")
                 st.text_area("प्रो सिनेमैटिक स्क्रिप्ट:", value=full_script, height=480)
 
                 st.download_button(
@@ -232,7 +282,7 @@ CHATBOT_SYSTEM_PROMPT = (
 )
 
 
-def _render_chatbot(active_client):
+def _render_chatbot(active_groq):
     st.subheader("💬 AI Assistant & Chatbot")
     st.write("यहाँ आप AI से किसी भी तरह की मदद, आइडिया या सवाल पूछ सकते हैं:")
 
@@ -252,7 +302,7 @@ def _render_chatbot(active_client):
         with st.chat_message("user"):
             st.markdown(user_query)
 
-        if not active_client:
+        if not active_groq and not get_github_client():
             st.error("🚨 AI Client उपलब्ध नहीं है!")
             return
 
@@ -260,16 +310,15 @@ def _render_chatbot(active_client):
             with st.spinner("AI सोच रहा है..."):
                 try:
                     trimmed_history = st.session_state.messages[-MAX_CHAT_HISTORY_MESSAGES:]
-                    chat_response = call_groq_with_retry(
-                        active_client,
-                        model=MODEL_NAME,
-                        messages=[{"role": "system", "content": CHATBOT_SYSTEM_PROMPT}]
-                        + [{"role": m["role"], "content": m["content"]} for m in trimmed_history],
-                        max_tokens=2000,
-                        temperature=0.7,
-                    )
+                    messages = [{"role": "system", "content": CHATBOT_SYSTEM_PROMPT}] + [
+                        {"role": m["role"], "content": m["content"]} for m in trimmed_history
+                    ]
+
+                    chat_response, provider = call_ai_with_fallback(active_groq, messages, max_tokens=2000, temperature=0.7)
                     bot_reply = chat_response.choices[0].message.content
+                    
                     st.markdown(bot_reply)
+                    st.caption(f"⚡ Responded via: {provider}")
                     st.session_state.messages.append({"role": "assistant", "content": bot_reply})
                 except Exception as e:
                     logger.exception("Chat completion failed")
