@@ -211,7 +211,11 @@ def export_docx_bytes(title: str, body: str) -> bytes:
 # Main page
 # ---------------------------------------------------------------------------
 
-def render_script_page():
+def render_script_page(groq_client=None):
+    # `groq_client` is accepted for backward compatibility with existing
+    # call sites (e.g. app.py calling render_script_page(groq_client)),
+    # but this module manages its own cached clients internally, so the
+    # argument is intentionally unused here.
     st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub — Pro")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए स्क्रिप्ट तैयार कर सकते हैं और AI चैटबॉट से बात कर सकते हैं:")
 
