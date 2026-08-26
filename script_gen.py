@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 GROQ_MODEL_NAME = "llama-3.1-8b-instant"
 GITHUB_MODEL_NAME = "openai/gpt-4o-mini"
 GITHUB_MODELS_ENDPOINT = "https://models.github.ai/inference"
-OPENROUTER_MODEL_NAME = "mistralai/mistral-7b-instruct:free"
+OPENROUTER_MODEL_NAME = "google/gemma-7b-it:free"
 OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
 
 MAX_CHAT_HISTORY_MESSAGES = 20
