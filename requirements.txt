@@ -45,3 +45,7 @@ Pillow>=10.0.0
 supabase>=2.9.0
 huggingface_hub>=0.26.0
 openai
+streamlit
+groq
+openai
+python-docx
