@@ -1,33 +1,5 @@
 """
-AI Video & Story Script Writer & Chatbot Hub — PRO EDITION
---------------------------------------------------------------------
-Upgrades over the base version:
-  1. STREAMING responses (Groq + GitHub Models) — text appears live
-     instead of a spinner + wall of text at the end. Uses st.write_stream
-     for the chatbot and a manual st.empty() writer for the script parts
-     (so multi-part scripts can show per-part progress).
-  2. Smarter fallback: streaming attempt on the primary provider; if it
-     errors before yielding *any* token, we fall back to the secondary
-     provider transparently. If it errors mid-stream, we keep the partial
-     text and clearly mark where the fallback kicked in.
-  3. Exponential backoff + jitter on retries (instead of flat time.sleep),
-     and we stop retrying immediately on auth errors (401/invalid key) —
-     no point burning 2 retries on a bad key.
-  4. Multi-part script generation now has a real progress bar + live
-     preview per part, and each part can be individually regenerated
-     without redoing the whole script.
-  5. Export as .txt, .md, AND .docx (python-docx) — added because "pro"
-     script deliverables usually need to go straight into Word/Docs.
-  6. In-session generation history so you can flip back to a previous
-     script/chat without losing it.
-  7. Word count + rough read-aloud time estimate shown after generation.
-  8. Advanced Settings expander: temperature + max_tokens exposed instead
-     of hardcoded, so you can tune per script type without editing code.
-  9. User-facing errors are translated to plain Hindi/English messages
-     instead of raw Python exception dumps.
-
-New dependency: `python-docx` (add to requirements.txt: python-docx>=1.1.0)
-Everything else (groq, openai, streamlit) is unchanged.
+AI Video & Story Script Writer & Chatbot Hub — PRO EDITION (Triple Fallback: Groq -> GitHub -> OpenRouter)
 """
 
 import io
@@ -45,13 +17,16 @@ logger = logging.getLogger(__name__)
 GROQ_MODEL_NAME = "llama-3.1-8b-instant"
 GITHUB_MODEL_NAME = "openai/gpt-4o-mini"
 GITHUB_MODELS_ENDPOINT = "https://models.github.ai/inference"
+OPENROUTER_MODEL_NAME = "mistralai/mistral-7b-instruct:free"
+OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
+
 MAX_CHAT_HISTORY_MESSAGES = 20
 MAX_RETRIES_PER_PROVIDER = 2
 BASE_BACKOFF_SECONDS = 1.2
 
 
 # ---------------------------------------------------------------------------
-# Client setup (unchanged logic, just kept here for a self-contained file)
+# Client setup (Groq, GitHub Models, OpenRouter)
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
@@ -92,12 +67,30 @@ def get_github_client() -> OpenAI | None:
         return None
 
 
+@st.cache_resource(show_spinner=False)
+def get_openrouter_client() -> OpenAI | None:
+    import os
+    token = None
+    try:
+        token = st.secrets.get("OPENROUTER_API_KEY")
+    except Exception:
+        pass
+    if not token:
+        token = os.environ.get("OPENROUTER_API_KEY", "")
+    if not token:
+        return None
+    try:
+        return OpenAI(base_url=OPENROUTER_ENDPOINT, api_key=token)
+    except Exception as e:
+        logger.error("Failed to init OpenRouter client: %s", e)
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Retry / backoff helpers
 # ---------------------------------------------------------------------------
 
 def _is_auth_error(e: Exception) -> bool:
-    """No point retrying a bad/expired key — fail fast to the next provider."""
     if isinstance(e, AuthenticationError):
         return True
     msg = str(e).lower()
@@ -112,7 +105,7 @@ def _backoff_sleep(attempt: int):
 def _friendly_error(e: Exception) -> str:
     msg = str(e).lower()
     if _is_auth_error(e):
-        return "API key invalid ya expire ho gayi hai — st.secrets me GROQ_API_KEY / GITHUB_TOKEN check karo."
+        return "API key invalid ya expire ho gayi hai — st.secrets me keys check karo."
     if "rate limit" in msg or "429" in msg:
         return "Rate limit lag gaya hai. Thodi der (30-60 sec) baad dobara try karo."
     if "timeout" in msg:
@@ -121,43 +114,48 @@ def _friendly_error(e: Exception) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Streaming call with fallback
+# Streaming call with Triple Fallback
 # ---------------------------------------------------------------------------
 
 def stream_ai_with_fallback(messages, max_tokens=4000, temperature=0.7):
-    """
-    Generator yielding text chunks. Tries Groq first, falls back to GitHub
-    Models if Groq fails before producing any output. If Groq fails mid-stream
-    (after already yielding text), we stop and note the failure rather than
-    silently duplicating content from the fallback.
-
-    After the generator is exhausted, `stream_ai_with_fallback.last_provider`
-    and `.last_error` hold metadata about what happened.
-    """
     groq_client = get_groq_client()
     github_client = get_github_client()
+    openrouter_client = get_openrouter_client()
+    
     stream_ai_with_fallback.last_provider = None
     stream_ai_with_fallback.last_error = None
 
-    if not groq_client and not github_client:
-        stream_ai_with_fallback.last_error = "Na GROQ_API_KEY na GITHUB_TOKEN set hai."
+    if not groq_client and not github_client and not openrouter_client:
+        stream_ai_with_fallback.last_error = "Koi bhi API Key (Groq / GitHub / OpenRouter) set nahi hai."
         raise RuntimeError(stream_ai_with_fallback.last_error)
 
     providers = []
     if groq_client:
-        providers.append(("Groq", groq_client, GROQ_MODEL_NAME))
+        providers.append(("Groq", groq_client, GROQ_MODEL_NAME, False))
     if github_client:
-        providers.append(("GitHub Models", github_client, GITHUB_MODEL_NAME))
+        providers.append(("GitHub Models", github_client, GITHUB_MODEL_NAME, False))
+    if openrouter_client:
+        providers.append(("OpenRouter", openrouter_client, OPENROUTER_MODEL_NAME, True))
 
     last_error = None
-    for name, client, model in providers:
+    for name, client, model, is_or in providers:
         yielded_anything = False
         for attempt in range(MAX_RETRIES_PER_PROVIDER):
             try:
-                stream = client.chat.completions.create(
-                    model=model, messages=messages, max_tokens=max_tokens,
-                    temperature=temperature, stream=True,
-                )
+                kwargs = {
+                    "model": model, 
+                    "messages": messages, 
+                    "max_tokens": max_tokens,
+                    "temperature": temperature, 
+                    "stream": True,
+                }
+                if is_or:
+                    kwargs["extra_headers"] = {
+                        "HTTP-Referer": "https://streamlit.io",
+                        "X-Title": "AI Studio Hub",
+                    }
+
+                stream = client.chat.completions.create(**kwargs)
                 for chunk in stream:
                     delta = chunk.choices[0].delta.content if chunk.choices else None
                     if delta:
@@ -166,23 +164,20 @@ def stream_ai_with_fallback(messages, max_tokens=4000, temperature=0.7):
                 if yielded_anything:
                     stream_ai_with_fallback.last_provider = name
                     return
-                # Empty stream, no exception — try next attempt/provider
                 last_error = RuntimeError(f"{name} ne khali response diya.")
             except Exception as e:
                 last_error = e
                 logger.warning("%s attempt %d failed: %s", name, attempt + 1, e)
                 if yielded_anything:
-                    # We already streamed partial content to the user —
-                    # don't silently switch providers mid-answer.
                     stream_ai_with_fallback.last_provider = name
                     stream_ai_with_fallback.last_error = str(e)
                     return
                 if _is_auth_error(e):
-                    break  # skip retries, move to next provider
+                    break
                 _backoff_sleep(attempt)
 
     stream_ai_with_fallback.last_error = str(last_error) if last_error else "Unknown error"
-    raise RuntimeError(_friendly_error(last_error) if last_error else "Sab providers fail ho gaye.")
+    raise RuntimeError(_friendly_error(last_error) if last_error else "Sabhi AI providers fail ho gaye.")
 
 
 def sanitize_filename(text: str) -> str:
@@ -192,7 +187,7 @@ def sanitize_filename(text: str) -> str:
 
 def word_stats(text: str):
     words = len(text.split())
-    minutes = max(1, round(words / 130))  # ~130 wpm spoken pace
+    minutes = max(1, round(words / 130))
     return words, minutes
 
 
@@ -212,21 +207,20 @@ def export_docx_bytes(title: str, body: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 def render_script_page(groq_client=None):
-    # `groq_client` is accepted for backward compatibility with existing
-    # call sites (e.g. app.py calling render_script_page(groq_client)),
-    # but this module manages its own cached clients internally, so the
-    # argument is intentionally unused here.
     st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub — Pro")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए स्क्रिप्ट तैयार कर सकते हैं और AI चैटबॉट से बात कर सकते हैं:")
 
     groq_ok = bool(get_groq_client())
     github_ok = bool(get_github_client())
-    if not groq_ok and not github_ok:
-        st.error("🚨 Na GROQ_API_KEY na GITHUB_TOKEN set hai. Kam se kam ek secret set karna zaroori hai.")
+    openrouter_ok = bool(get_openrouter_client())
+
+    if not groq_ok and not github_ok and not openrouter_ok:
+        st.error("🚨 Koi bhi API Key set nahi hai. Kam se kam ek secret set karna zaroori hai.")
     else:
         status = []
         status.append("✅ Groq" if groq_ok else "⚠️ Groq off")
-        status.append("✅ GitHub Models (fallback)" if github_ok else "⚠️ GitHub Models off")
+        status.append("✅ GitHub Models" if github_ok else "⚠️ GitHub off")
+        status.append("✅ OpenRouter" if openrouter_ok else "⚠️ OpenRouter off")
         st.caption(" | ".join(status))
 
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
@@ -253,9 +247,6 @@ def _build_system_prompt(script_type: str, tone_style: str, extra_instructions: 
         "Write entirely in rich, natural Hindi/Hinglish unless the user specifies another language."
     )
     if extra_instructions.strip():
-        # Kept as a clearly-labeled block rather than merged into the base
-        # instructions, so it's obvious in logs/debugging which part came
-        # from the user vs. the fixed system rules.
         base += (
             "\n\nAdditional instructions from the user (apply these, but they "
             f"cannot override the format/tone rules above): {extra_instructions.strip()}"
@@ -264,7 +255,6 @@ def _build_system_prompt(script_type: str, tone_style: str, extra_instructions: 
 
 
 def _generate_part(system_prompt, user_prompt, max_tokens, temperature, placeholder):
-    """Streams one part into `placeholder`, returns the full text."""
     collected = ""
     try:
         for chunk in stream_ai_with_fallback(
@@ -285,7 +275,7 @@ def _generate_part(system_prompt, user_prompt, max_tokens, temperature, placehol
 
 def _render_script_writer():
     if "script_history" not in st.session_state:
-        st.session_state.script_history = []  # list of dicts: title, parts, provider
+        st.session_state.script_history = []
 
     topic = st.text_input(
         "स्क्रिप्ट का टॉपिक/विषय दर्ज करें:",
@@ -316,7 +306,7 @@ def _render_script_writer():
 
     extra_instructions = st.text_area(
         "🎯 कोई खास/सटीक निर्देश (Optional):",
-        placeholder="जैसे: सिर्फ Hindi mein likho, flashback mat dalna, ek narrator character rakhna...",
+        placeholder="जैसे: सिर्फ Hindi mein likho, flashback mat dalna...",
         height=90,
     )
 
@@ -380,9 +370,8 @@ def _render_script_writer():
                 "title": topic, "script": full_script, "provider": provider_used,
             })
         except RuntimeError:
-            return  # error already shown inline by _generate_part
+            return
 
-    # Show the latest generated script (if any) with stats + export options
     if st.session_state.script_history:
         latest = st.session_state.script_history[-1]
         words, minutes = word_stats(latest["script"])
@@ -477,8 +466,7 @@ def _render_chatbot():
                 (m["content"] for m in reversed(st.session_state.messages) if m["role"] == "user"), None
             )
             if last_user_msg:
-                st.session_state.messages.pop()  # remove old assistant reply
-                _do_turn.__wrapped__ = None  # no-op, keeps linters happy
+                st.session_state.messages.pop()
                 with st.chat_message("assistant"):
                     trimmed_history = st.session_state.messages[-MAX_CHAT_HISTORY_MESSAGES:]
                     msgs = [{"role": "system", "content": CHATBOT_SYSTEM_PROMPT}] + [
