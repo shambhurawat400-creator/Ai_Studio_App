@@ -1,5 +1,5 @@
 """
-AI Video & Story Script Writer & Chatbot Hub — PRO EDITION (Dual Fallback: Groq -> GitHub)
+AI Video & Story Script Writer & Chatbot Hub — GEMINI EDITION
 """
 
 import io
@@ -9,147 +9,83 @@ import time
 import logging
 
 import streamlit as st
-from groq import Groq
-from openai import OpenAI, AuthenticationError, APIConnectionError
+from google import genai
+from google.genai import errors
 
 logger = logging.getLogger(__name__)
 
-GROQ_MODEL_NAME = "llama-3.1-8b-instant"
-GITHUB_MODEL_NAME = "openai/gpt-4o-mini"
-# Correct endpoint with /v1 for OpenAI client compatibility
-GITHUB_MODELS_ENDPOINT = "https://models.inference.ai.azure.com/v1"
+GEMINI_MODEL_NAME = "gemini-1.5-flash"
 
 MAX_CHAT_HISTORY_MESSAGES = 20
-MAX_RETRIES_PER_PROVIDER = 2
-BASE_BACKOFF_SECONDS = 1.2
 
 
 # ---------------------------------------------------------------------------
-# Client setup (Groq, GitHub Models)
+# Gemini Client Setup
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
-def get_groq_client() -> Groq | None:
+def get_gemini_client() -> genai.Client | None:
     import os
     api_key = None
     try:
-        api_key = st.secrets.get("GROQ_API_KEY")
+        api_key = st.secrets.get("GEMINI_API_KEY")
     except Exception:
         pass
     if not api_key:
-        api_key = os.environ.get("GROQ_API_KEY", "")
+        api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         return None
     try:
-        return Groq(api_key=api_key)
+        return genai.Client(api_key=api_key)
     except Exception as e:
-        logger.error("Failed to init Groq client: %s", e)
-        return None
-
-
-@st.cache_resource(show_spinner=False)
-def get_github_client() -> OpenAI | None:
-    import os
-    token = None
-    try:
-        token = st.secrets.get("api_keys", {}).get("GITHUB_TOKEN") or st.secrets.get("GITHUB_TOKEN")
-    except Exception:
-        pass
-    if not token:
-        token = os.environ.get("GITHUB_TOKEN", "")
-    if not token:
-        return None
-    try:
-        return OpenAI(base_url=GITHUB_MODELS_ENDPOINT, api_key=token)
-    except Exception as e:
-        logger.error("Failed to init GitHub Models client: %s", e)
+        logger.error("Failed to init Gemini client: %s", e)
         return None
 
 
 # ---------------------------------------------------------------------------
-# Retry / backoff helpers
+# Streaming call with Gemini
 # ---------------------------------------------------------------------------
 
-def _is_auth_error(e: Exception) -> bool:
-    if isinstance(e, AuthenticationError):
-        return True
-    msg = str(e).lower()
-    return any(s in msg for s in ["401", "invalid api key", "unauthorized", "authentication"])
+def stream_gemini_response(messages, max_tokens=4000, temperature=0.7):
+    client = get_gemini_client()
+    if not client:
+        raise RuntimeError("Gemini API Key set nahi hai! Streamlit Secrets mein GEMINI_API_KEY add karein.")
 
-
-def _backoff_sleep(attempt: int):
-    delay = BASE_BACKOFF_SECONDS * (2 ** attempt) + random.uniform(0, 0.4)
-    time.sleep(delay)
-
-
-def _friendly_error(e: Exception) -> str:
-    msg = str(e).lower()
-    if isinstance(e, APIConnectionError) or "connection error" in msg:
-        return "Network Connection Error: GitHub AI endpoint se connect nahi ho pa raha hai. Please check karein ki aapke Streamlit Secrets mein GROQ_API_KEY bhi dali ho taaki app Groq se chal sake."
-    if _is_auth_error(e):
-        return "API key invalid ya expire ho gayi hai — st.secrets me keys check karo."
-    if "rate limit" in msg or "429" in msg:
-        return "Rate limit lag gaya hai. Thodi der baad dobara try karo."
-    return f"Kuch gadbad ho gayi: {str(e)[:200]}"
-
-
-# ---------------------------------------------------------------------------
-# Streaming call with Dual Fallback (Groq -> GitHub)
-# ---------------------------------------------------------------------------
-
-def stream_ai_with_fallback(messages, max_tokens=4000, temperature=0.7):
-    groq_client = get_groq_client()
-    github_client = get_github_client()
+    # Convert chat messages format to Gemini contents format
+    contents = []
+    system_instruction = None
     
-    stream_ai_with_fallback.last_provider = None
-    stream_ai_with_fallback.last_error = None
+    for msg in messages:
+        role = msg.get("role")
+        content = msg.get("content")
+        if role == "system":
+            system_instruction = content
+        elif role == "user":
+            contents.append(f"User: {content}")
+        elif role == "assistant":
+            contents.append(f"Model: {content}")
 
-    if not groq_client and not github_client:
-        stream_ai_with_fallback.last_error = "Koi bhi API Key (Groq / GitHub) set nahi hai."
-        raise RuntimeError(stream_ai_with_fallback.last_error)
+    try:
+        config = {
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+        }
+        if system_instruction:
+            config["system_instruction"] = system_instruction
 
-    providers = []
-    if groq_client:
-        providers.append(("Groq", groq_client, GROQ_MODEL_NAME))
-    if github_client:
-        providers.append(("GitHub Models", github_client, GITHUB_MODEL_NAME))
-
-    last_error = None
-    for name, client, model in providers:
-        yielded_anything = False
-        for attempt in range(MAX_RETRIES_PER_PROVIDER):
-            try:
-                kwargs = {
-                    "model": model, 
-                    "messages": messages, 
-                    "max_tokens": max_tokens,
-                    "temperature": temperature, 
-                    "stream": True,
-                }
-
-                stream = client.chat.completions.create(**kwargs)
-                for chunk in stream:
-                    delta = chunk.choices[0].delta.content if chunk.choices else None
-                    if delta:
-                        yielded_anything = True
-                        yield delta
-                if yielded_anything:
-                    stream_ai_with_fallback.last_provider = name
-                    return
-                last_error = RuntimeError(f"{name} ne khali response diya.")
-            except Exception as e:
-                last_error = e
-                logger.warning("%s attempt %d failed: %s", name, attempt + 1, e)
-                if yielded_anything:
-                    stream_ai_with_fallback.last_provider = name
-                    stream_ai_with_fallback.last_error = str(e)
-                    return
-                if _is_auth_error(e):
-                    break
-                _backoff_sleep(attempt)
-
-    stream_ai_with_fallback.last_error = str(last_error) if last_error else "Unknown error"
-    raise RuntimeError(_friendly_error(last_error) if last_error else "Sabhi AI providers fail ho gaye.")
+        response = client.models.generate_content_stream(
+            model=GEMINI_MODEL_NAME,
+            contents="\n".join(contents),
+            config=config,
+        )
+        
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+                
+    except Exception as e:
+        logger.error("Gemini generation error: %s", e)
+        raise RuntimeError(f"Gemini Error: {str(e)}")
 
 
 def sanitize_filename(text: str) -> str:
@@ -179,19 +115,15 @@ def export_docx_bytes(title: str, body: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 def render_script_page(groq_client=None):
-    st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub — Pro")
+    st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub — Gemini Pro")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए स्क्रिप्ट तैयार कर सकते हैं और AI चैटबॉट से बात कर सकते हैं:")
 
-    groq_ok = bool(get_groq_client())
-    github_ok = bool(get_github_client())
+    gemini_ok = bool(get_gemini_client())
 
-    if not groq_ok and not github_ok:
-        st.error("🚨 Koi bhi API Key set nahi hai. Kam se kam ek secret set karna zaroori hai.")
+    if not gemini_ok:
+        st.error("🚨 GEMINI_API_KEY set nahi hai. Kripya Streamlit Secrets mein apni Gemini API key save karein.")
     else:
-        status = []
-        status.append("✅ Groq" if groq_ok else "⚠️ Groq off")
-        status.append("✅ GitHub Models" if github_ok else "⚠️ GitHub off")
-        st.caption(" | ".join(status))
+        st.caption("✅ Powered by Google Gemini Pro / Flash")
 
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
 
@@ -227,11 +159,11 @@ def _build_system_prompt(script_type: str, tone_style: str, extra_instructions: 
 def _generate_part(system_prompt, user_prompt, max_tokens, temperature, placeholder):
     collected = ""
     try:
-        for chunk in stream_ai_with_fallback(
-            messages=[{"role": "system", "content": system_prompt},
-                      {"role": "user", "content": user_prompt}],
-            max_tokens=max_tokens, temperature=temperature,
-        ):
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        for chunk in stream_gemini_response(messages, max_tokens=max_tokens, temperature=temperature):
             collected += chunk
             placeholder.markdown(collected + "▌")
         placeholder.markdown(collected)
@@ -240,7 +172,7 @@ def _generate_part(system_prompt, user_prompt, max_tokens, temperature, placehol
         raise
     if not collected.strip():
         raise RuntimeError("Khali response mila — dobara koshish karo.")
-    return collected, stream_ai_with_fallback.last_provider
+    return collected
 
 
 def _render_script_writer():
@@ -281,7 +213,7 @@ def _render_script_writer():
     )
 
     with st.expander("⚙️ Advanced Settings"):
-        temperature = st.slider("Creativity (temperature)", 0.2, 1.2, 0.8, 0.1)
+        temperature = st.slider("Creativity (temperature)", 0.2, 1.2, 0.7, 0.1)
         max_tokens_per_part = st.slider("Max tokens per part", 1000, 8000, 4000, 500)
 
     generate_clicked = st.button("Generate Pro Cinematic Script ✍️🎬", type="primary", use_container_width=True)
@@ -302,7 +234,6 @@ def _render_script_writer():
         progress = st.progress(0.0, text="शुरू कर रहे हैं...")
         part_texts = []
         previous_context = ""
-        provider_used = None
 
         try:
             for i in range(1, parts + 1):
@@ -324,7 +255,7 @@ def _render_script_writer():
                         "Include a strong hook at the start."
                     )
 
-                part_text, provider_used = _generate_part(
+                part_text = _generate_part(
                     system_prompt, user_prompt, max_tokens_per_part, temperature, placeholder
                 )
                 part_texts.append(part_text)
@@ -337,7 +268,7 @@ def _render_script_writer():
             )
             progress.progress(1.0, text="पूरा हुआ! ✅")
             st.session_state.script_history.append({
-                "title": topic, "script": full_script, "provider": provider_used,
+                "title": topic, "script": full_script, "provider": "Google Gemini",
             })
         except RuntimeError:
             return
@@ -346,7 +277,7 @@ def _render_script_writer():
         latest = st.session_state.script_history[-1]
         words, minutes = word_stats(latest["script"])
         st.divider()
-        st.caption(f"⚙️ Powered by: {latest['provider']}  |  📝 {words} words  |  🎙️ ~{minutes} min read")
+        st.caption(f"⚙️ Powered by: Google Gemini  |  📝 {words} words  |  🎙️ ~{minutes} min read")
 
         c1, c2, c3 = st.columns(3)
         with c1:
@@ -419,9 +350,8 @@ def _render_chatbot():
                 {"role": m["role"], "content": m["content"]} for m in trimmed_history
             ]
             try:
-                bot_reply = st.write_stream(stream_ai_with_fallback(msgs, max_tokens=2000, temperature=0.7))
-                provider = stream_ai_with_fallback.last_provider
-                st.caption(f"⚙️ Powered by: {provider}")
+                bot_reply = st.write_stream(stream_gemini_response(msgs, max_tokens=2000, temperature=0.7))
+                st.caption("⚙️ Powered by: Google Gemini")
                 st.session_state.messages.append({"role": "assistant", "content": bot_reply})
             except RuntimeError as e:
                 st.error(str(e))
@@ -442,7 +372,7 @@ def _render_chatbot():
                         {"role": m["role"], "content": m["content"]} for m in trimmed_history
                     ]
                     try:
-                        bot_reply = st.write_stream(stream_ai_with_fallback(msgs, max_tokens=2000, temperature=0.7))
+                        bot_reply = st.write_stream(stream_gemini_response(msgs, max_tokens=2000, temperature=0.7))
                         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
                     except RuntimeError as e:
                         st.error(str(e))
