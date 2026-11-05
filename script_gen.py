@@ -20,7 +20,7 @@ MAX_CHAT_HISTORY_MESSAGES = 20
 
 
 # ---------------------------------------------------------------------------
-# Gemini Client Setup (Interactions API ready)
+# Gemini Client Setup
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
@@ -43,15 +43,15 @@ def get_gemini_client() -> genai.Client | None:
 
 
 # ---------------------------------------------------------------------------
-# Robust Fast Streaming call with Interactions API
+# Robust & Fast Streaming Response
 # ---------------------------------------------------------------------------
 
-def stream_gemini_response(messages, max_tokens=8000, temperature=0.7, previous_interaction_id=None):
+def stream_gemini_response(messages, max_tokens=8000, temperature=0.7):
     client = get_gemini_client()
     if not client:
         raise RuntimeError("Gemini API Key set nahi hai! Streamlit Secrets mein GEMINI_API_KEY add karein.")
 
-    input_parts = []
+    contents = []
     system_instruction = None
     
     for msg in messages:
@@ -60,42 +60,30 @@ def stream_gemini_response(messages, max_tokens=8000, temperature=0.7, previous_
         if role == "system":
             system_instruction = content
         elif role == "user":
-            input_parts.append({"type": "text", "text": f"User: {content}"})
+            contents.append(f"User: {content}")
         elif role == "assistant":
-            input_parts.append({"type": "text", "text": f"Model: {content}"})
+            contents.append(f"Model: {content}")
 
     try:
-        create_kwargs = {
-            "model": GEMINI_MODEL_NAME,
-            "input": input_parts,
-            "stream": True,
+        config = {
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
         }
         if system_instruction:
-            create_kwargs["system_instruction"] = system_instruction
-        if previous_interaction_id:
-            create_kwargs["previous_interaction_id"] = previous_interaction_id
+            config["system_instruction"] = system_instruction
 
-        response = client.interactions.create(**create_kwargs)
+        response = client.models.generate_content_stream(
+            model=GEMINI_MODEL_NAME,
+            contents="\n".join(contents),
+            config=config,
+        )
         
         for chunk in response:
-            text_piece = None
-            if hasattr(chunk, "text") and chunk.text:
-                text_piece = chunk.text
-            elif hasattr(chunk, "step") and chunk.step:
-                if hasattr(chunk.step, "delta") and chunk.step.delta:
-                    for part in chunk.step.delta:
-                        if hasattr(part, "text") and part.text:
-                            yield part.text
-                elif hasattr(chunk.step, "content") and chunk.step.content:
-                    for part in chunk.step.content:
-                        if hasattr(part, "text") and part.text:
-                            yield part.text
-            
-            if text_piece:
-                yield text_piece
+            if getattr(chunk, "text", None):
+                yield chunk.text
                 
     except Exception as e:
-        logger.error("Gemini Interactions generation error: %s", e)
+        logger.error("Gemini generation error: %s", e)
         raise RuntimeError(f"Gemini Error: {str(e)}")
 
 
@@ -134,7 +122,7 @@ def render_script_page(groq_client=None):
     if not gemini_ok:
         st.error("🚨 GEMINI_API_KEY set nahi hai. Kripya Streamlit Secrets mein apni Gemini API key save karein.")
     else:
-        st.caption("✅ Powered by Google Gemini Flash-Lite (Interactions API)")
+        st.caption("✅ Powered by Google Gemini Flash-Lite")
 
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
 
