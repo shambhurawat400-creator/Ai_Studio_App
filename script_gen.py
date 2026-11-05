@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 GROQ_MODEL_NAME = "llama-3.1-8b-instant"
 GITHUB_MODEL_NAME = "openai/gpt-4o-mini"
-GITHUB_MODELS_ENDPOINT = "https://models.github.ai/inference"
+GITHUB_MODELS_ENDPOINT = "https://models.inference.ai.azure.com"
 OPENROUTER_MODEL_NAME = "google/gemma-7b-it:free"
 OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
 
@@ -53,7 +53,7 @@ def get_github_client() -> OpenAI | None:
     import os
     token = None
     try:
-        token = st.secrets.get("GITHUB_TOKEN")
+        token = st.secrets.get("api_keys", {}).get("GITHUB_TOKEN") or st.secrets.get("GITHUB_TOKEN")
     except Exception:
         pass
     if not token:
