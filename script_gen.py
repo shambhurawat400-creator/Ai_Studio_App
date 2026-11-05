@@ -64,49 +64,35 @@ def stream_gemini_response(messages, max_tokens=8000, temperature=0.7):
         elif role == "assistant":
             contents.append(f"Model: {content}")
 
-    try:
-        config = {
-            "temperature": temperature,
-            "max_output_tokens": max_tokens,
-        }
-        if system_instruction:
-            config["system_instruction"] = system_instruction
+    config = {
+        "temperature": temperature,
+        "max_output_tokens": max_tokens,
+    }
+    if system_instruction:
+        config["system_instruction"] = system_instruction
 
-        response = client.models.generate_content_stream(
-            model=GEMINI_MODEL_NAME,
-            contents="\n".join(contents),
-            config=config,
-        )
-        
-        for chunk in response:
-            if getattr(chunk, "text", None):
-                yield chunk.text
-                
-    except Exception as e:
-        logger.error("Gemini generation error: %s", e)
-        raise RuntimeError(f"Gemini Error: {str(e)}")
-
-
-def sanitize_filename(text: str) -> str:
-    text = text.strip()[:40]
-    return re.sub(r"[^\w\-]+", "_", text) or "script"
-
-
-def word_stats(text: str):
-    words = len(text.split())
-    minutes = max(1, round(words / 130))
-    return words, minutes
-
-
-def export_docx_bytes(title: str, body: str) -> bytes:
-    from docx import Document
-    doc = Document()
-    doc.add_heading(title or "Script", level=1)
-    for para in body.split("\n"):
-        doc.add_paragraph(para)
-    buf = io.BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
+    # Automatic Retry mechanism for 503 High Demand errors
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content_stream(
+                model=GEMINI_MODEL_NAME,
+                contents="\n".join(contents),
+                config=config,
+            )
+            
+            for chunk in response:
+                if getattr(chunk, "text", None):
+                    yield chunk.text
+            return # Successfully completed
+        except Exception as e:
+            err_str = str(e)
+            if "503" in err_str or "UNAVAILABLE" in err_str:
+                if attempt < max_retries - 1:
+                    time.sleep(3) # Wait 3 seconds before retry
+                    continue
+            logger.error("Gemini generation error: %s", e)
+            raise RuntimeError(f"Gemini Error: {err_str}")
 
 
 # ---------------------------------------------------------------------------
