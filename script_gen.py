@@ -10,7 +10,7 @@ import logging
 
 import streamlit as st
 from groq import Groq
-from openai import OpenAI, AuthenticationError
+from openai import OpenAI, AuthenticationError, APIConnectionError
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,14 @@ def _backoff_sleep(attempt: int):
 
 
 def _friendly_error(e: Exception) -> str:
-    return f"Asli Error -> {type(e).__name__}: {str(e)}"
+    msg = str(e).lower()
+    if isinstance(e, APIConnectionError) or "connection error" in msg:
+        return "Network connection error: API server tak request nahi pahunch pa rahi hai. Apna internet connection ya API endpoint check karein."
+    if _is_auth_error(e):
+        return "API key invalid ya expire ho gayi hai — st.secrets me keys check karo."
+    if "rate limit" in msg or "429" in msg:
+        return "Rate limit lag gaya hai. Thodi der baad dobara try karo."
+    return f"Kuch gadbad ho gayi: {str(e)[:200]}"
 
 
 # ---------------------------------------------------------------------------
