@@ -1,5 +1,5 @@
 """
-AI Video & Story Script Writer & Chatbot Hub — INTERACTIONS API EDITION
+AI Video & Story Script Writer & Chatbot Hub — GEMINI FLASH-LITE EDITION
 """
 
 import io
@@ -14,7 +14,7 @@ from google.genai import errors
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL_NAME = "gemini-3.8-flash"
+GEMINI_MODEL_NAME = "gemini-3.5-flash-lite"
 
 MAX_CHAT_HISTORY_MESSAGES = 20
 
@@ -51,7 +51,6 @@ def stream_gemini_response(messages, max_tokens=4000, temperature=0.7, previous_
     if not client:
         raise RuntimeError("Gemini API Key set nahi hai! Streamlit Secrets mein GEMINI_API_KEY add karein.")
 
-    # Format input contents and system instructions
     input_parts = []
     system_instruction = None
     
@@ -79,7 +78,6 @@ def stream_gemini_response(messages, max_tokens=4000, temperature=0.7, previous_
         response = client.interactions.create(**create_kwargs)
         
         for chunk in response:
-            # Handle streaming steps delta format for Interactions API
             if hasattr(chunk, "step") and chunk.step and hasattr(chunk.step, "delta"):
                 delta_content = chunk.step.delta
                 if delta_content:
@@ -121,7 +119,7 @@ def export_docx_bytes(title: str, body: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 def render_script_page(groq_client=None):
-    st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub — Gemini 3.8 Flash")
+    st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub — Gemini Flash-Lite")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए स्क्रिप्ट तैयार कर सकते हैं और AI चैटबॉट से बात कर सकते हैं:")
 
     gemini_ok = bool(get_gemini_client())
@@ -129,7 +127,7 @@ def render_script_page(groq_client=None):
     if not gemini_ok:
         st.error("🚨 GEMINI_API_KEY set nahi hai. Kripya Streamlit Secrets mein apni Gemini API key save karein.")
     else:
-        st.caption("✅ Powered by Google Gemini Interactions API")
+        st.caption("✅ Powered by Google Gemini Flash-Lite")
 
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
 
@@ -274,7 +272,7 @@ def _render_script_writer():
             )
             progress.progress(1.0, text="पूरा हुआ! ✅")
             st.session_state.script_history.append({
-                "title": topic, "script": full_script, "provider": "Google Gemini (Interactions API)",
+                "title": topic, "script": full_script, "provider": "Google Gemini Flash-Lite",
             })
         except RuntimeError:
             return
@@ -283,7 +281,7 @@ def _render_script_writer():
         latest = st.session_state.script_history[-1]
         words, minutes = word_stats(latest["script"])
         st.divider()
-        st.caption(f"⚙️ Powered by: Google Gemini  |  📝 {words} words  |  🎙️ ~{minutes} min read")
+        st.caption(f"⚙️ Powered by: Google Gemini Flash-Lite  |  📝 {words} words  |  🎙️ ~{minutes} min read")
 
         c1, c2, c3 = st.columns(3)
         with c1:
@@ -307,7 +305,7 @@ def _render_script_writer():
             with st.expander(f"📚 पिछली scripts ({len(st.session_state.script_history) - 1})"):
                 for idx, item in enumerate(reversed(st.session_state.script_history[:-1])):
                     st.write(f"**{item['title']}**")
-                    st.text_update = st.text_area("", value=item["script"], height=150, key=f"hist_{idx}", label_visibility="collapsed")
+                    st.text_area("", value=item["script"], height=150, key=f"hist_{idx}", label_visibility="collapsed")
 
 
 # ---------------------------------------------------------------------------
@@ -357,7 +355,7 @@ def _render_chatbot():
             ]
             try:
                 bot_reply = st.write_stream(stream_gemini_response(msgs, max_tokens=2000, temperature=0.7))
-                st.caption("⚙️ Powered by: Google Gemini")
+                st.caption("⚙️ Powered by: Google Gemini Flash-Lite")
                 st.session_state.messages.append({"role": "assistant", "content": bot_reply})
             except RuntimeError as e:
                 st.error(str(e))
