@@ -82,14 +82,7 @@ def _backoff_sleep(attempt: int):
 
 
 def _friendly_error(e: Exception) -> str:
-    msg = str(e).lower()
-    if _is_auth_error(e):
-        return "API key invalid ya expire ho gayi hai — st.secrets me keys check karo."
-    if "rate limit" in msg or "429" in msg:
-        return "Rate limit lag gaya hai. Thodi der (30-60 sec) baad dobara try karo."
-    if "timeout" in msg:
-        return "Request timeout ho gayi — network slow ho sakta hai, dobara try karo."
-    return f"Kuch gadbad ho gayi: {str(e)[:200]}"
+    return f"Asli Error -> {type(e).__name__}: {str(e)}"
 
 
 # ---------------------------------------------------------------------------
