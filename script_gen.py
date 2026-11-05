@@ -14,7 +14,7 @@ from google.genai import errors
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL_NAME = "gemini-1.5-flash"
+GEMINI_MODEL_NAME = "gemini-2.5-flash"
 
 MAX_CHAT_HISTORY_MESSAGES = 20
 
@@ -51,7 +51,6 @@ def stream_gemini_response(messages, max_tokens=4000, temperature=0.7):
     if not client:
         raise RuntimeError("Gemini API Key set nahi hai! Streamlit Secrets mein GEMINI_API_KEY add karein.")
 
-    # Convert chat messages format to Gemini contents format
     contents = []
     system_instruction = None
     
@@ -123,7 +122,7 @@ def render_script_page(groq_client=None):
     if not gemini_ok:
         st.error("🚨 GEMINI_API_KEY set nahi hai. Kripya Streamlit Secrets mein apni Gemini API key save karein.")
     else:
-        st.caption("✅ Powered by Google Gemini Pro / Flash")
+        st.caption("✅ Powered by Google Gemini")
 
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
 
