@@ -1,5 +1,5 @@
 """
-AI Video & Story Script Writer & Chatbot Hub — GEMINI FLASH-LITE EDITION
+AI Video & Story Script Writer & Chatbot Hub — ULTRA-FAST FLASH-LITE EDITION
 """
 
 import io
@@ -20,7 +20,7 @@ MAX_CHAT_HISTORY_MESSAGES = 20
 
 
 # ---------------------------------------------------------------------------
-# Gemini Client Setup (Interactions API ready)
+# Gemini Client Setup (Interactions API ready)[span_0](start_span)[span_0](end_span)
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
@@ -43,10 +43,10 @@ def get_gemini_client() -> genai.Client | None:
 
 
 # ---------------------------------------------------------------------------
-# Streaming call with Interactions API
+# Fast Streaming call with Interactions API[span_1](start_span)[span_1](end_span)
 # ---------------------------------------------------------------------------
 
-def stream_gemini_response(messages, max_tokens=4000, temperature=0.7, previous_interaction_id=None):
+def stream_gemini_response(messages, max_tokens=8000, temperature=0.7, previous_interaction_id=None):
     client = get_gemini_client()
     if not client:
         raise RuntimeError("Gemini API Key set nahi hai! Streamlit Secrets mein GEMINI_API_KEY add karein.")
@@ -119,7 +119,7 @@ def export_docx_bytes(title: str, body: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 def render_script_page(groq_client=None):
-    st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub — Gemini Flash-Lite")
+    st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub — Ultra-Fast")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए स्क्रिप्ट तैयार कर सकते हैं और AI चैटबॉट से बात कर सकते हैं:")
 
     gemini_ok = bool(get_gemini_client())
@@ -127,7 +127,7 @@ def render_script_page(groq_client=None):
     if not gemini_ok:
         st.error("🚨 GEMINI_API_KEY set nahi hai. Kripya Streamlit Secrets mein apni Gemini API key save karein.")
     else:
-        st.caption("✅ Powered by Google Gemini Flash-Lite")
+        st.caption("✅ Powered by Google Gemini Flash-Lite (Interactions API)[span_2](start_span)[span_2](end_span)")
 
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
 
@@ -158,25 +158,6 @@ def _build_system_prompt(script_type: str, tone_style: str, extra_instructions: 
             f"cannot override the format/tone rules above): {extra_instructions.strip()}"
         )
     return base
-
-
-def _generate_part(system_prompt, user_prompt, max_tokens, temperature, placeholder):
-    collected = ""
-    try:
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-        for chunk in stream_gemini_response(messages, max_tokens=max_tokens, temperature=temperature):
-            collected += chunk
-            placeholder.markdown(collected + "▌")
-        placeholder.markdown(collected)
-    except RuntimeError as e:
-        placeholder.error(str(e))
-        raise
-    if not collected.strip():
-        raise RuntimeError("Khali response mila — dobara koshish karo.")
-    return collected
 
 
 def _render_script_writer():
@@ -218,7 +199,7 @@ def _render_script_writer():
 
     with st.expander("⚙️ Advanced Settings"):
         temperature = st.slider("Creativity (temperature)", 0.2, 1.2, 0.7, 0.1)
-        max_tokens_per_part = st.slider("Max tokens per part", 1000, 8000, 4000, 500)
+        max_tokens = st.slider("Max tokens", 2000, 8000, 6000, 500)
 
     generate_clicked = st.button("Generate Pro Cinematic Script ✍️🎬", type="primary", use_container_width=True)
 
@@ -228,53 +209,43 @@ def _render_script_writer():
             return
 
         if "8000+" in length_option:
-            parts, words_per_part = 5, "लगभग 1500-2000 शब्दों का विस्तार, गहरे विवरण के साथ"
+            length_desc = "विस्तृत और लंबी महाकाव्य स्क्रिप्ट (8000+ शब्द)"
         elif "3000 - 5000" in length_option:
-            parts, words_per_part = 3, "लगभग 1200-1500 शब्दों का विस्तार"
+            length_desc = "विस्तृत लंबी कहानी / वीडियो स्क्रिप्ट (3000 - 5000 शब्द)"
         else:
-            parts, words_per_part = 1, "लगभग 1000 शब्दों का संपूर्ण विस्तार"
+            length_desc = "संतुलित मध्यम स्क्रिप्ट (1000 - 2000 शब्द)"
 
         system_prompt = _build_system_prompt(script_type, tone_style, extra_instructions)
-        progress = st.progress(0.0, text="शुरू कर रहे हैं...")
-        part_texts = []
-        previous_context = ""
+        user_prompt = (
+            f"Write a complete cinematic script on the topic: '{topic}'. "
+            f"Length requirement: {length_desc}. "
+            "Include a strong hook, detailed scenes, camera cues, and complete dialogues."
+        )
+
+        st.markdown(f"**[ स्क्रिप्ट जनरेट हो रही है... ]**")
+        placeholder = st.empty()
+        collected = ""
 
         try:
-            for i in range(1, parts + 1):
-                progress.progress((i - 1) / parts, text=f"भाग {i}/{parts} लिखा जा रहा है...")
-                st.markdown(f"**[ सीन / भाग {i} ]**")
-                placeholder = st.empty()
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+            for chunk in stream_gemini_response(messages, max_tokens=max_tokens, temperature=temperature):
+                collected += chunk
+                placeholder.markdown(collected + "▌")
+            placeholder.markdown(collected)
 
-                if parts > 1:
-                    user_prompt = (
-                        f"Write Part {i} of {parts} on the topic: '{topic}'. "
-                        f"Length requirement: {words_per_part}. "
-                        "Continue directly from this previous context (maintain continuity, "
-                        f"do not repeat it): '{previous_context[-400:]}'"
-                    )
-                else:
-                    user_prompt = (
-                        f"Write a complete script on the topic: '{topic}'. "
-                        f"Length requirement: {words_per_part}. "
-                        "Include a strong hook at the start."
-                    )
+            if not collected.strip():
+                st.error("खाली रिस्पॉन्स मिला — कृपया दोबारा कोशिश करें।")
+                return
 
-                part_text = _generate_part(
-                    system_prompt, user_prompt, max_tokens_per_part, temperature, placeholder
-                )
-                part_texts.append(part_text)
-                previous_context = part_text
-                progress.progress(i / parts, text=f"भाग {i}/{parts} पूरा हुआ")
-
-            full_script = "\n\n".join(
-                f"==================== [ सीन / भाग {idx} ] ====================\n\n{txt}"
-                for idx, txt in enumerate(part_texts, start=1)
-            )
-            progress.progress(1.0, text="पूरा हुआ! ✅")
             st.session_state.script_history.append({
-                "title": topic, "script": full_script, "provider": "Google Gemini Flash-Lite",
+                "title": topic, "script": collected, "provider": "Google Gemini Flash-Lite",
             })
-        except RuntimeError:
+            st.success("स्क्रिप्ट सफलतापर्वक तैयार हो गई है! ✅")
+        except RuntimeError as e:
+            placeholder.error(str(e))
             return
 
     if st.session_state.script_history:
@@ -354,7 +325,7 @@ def _render_chatbot():
                 {"role": m["role"], "content": m["content"]} for m in trimmed_history
             ]
             try:
-                bot_reply = st.write_stream(stream_gemini_response(msgs, max_tokens=2000, temperature=0.7))
+                bot_reply = st.write_stream(stream_gemini_response(msgs, max_tokens=4000, temperature=0.7))
                 st.caption("⚙️ Powered by: Google Gemini Flash-Lite")
                 st.session_state.messages.append({"role": "assistant", "content": bot_reply})
             except RuntimeError as e:
@@ -376,7 +347,7 @@ def _render_chatbot():
                         {"role": m["role"], "content": m["content"]} for m in trimmed_history
                     ]
                     try:
-                        bot_reply = st.write_stream(stream_gemini_response(msgs, max_tokens=2000, temperature=0.7))
+                        bot_reply = st.write_stream(stream_gemini_response(msgs, max_tokens=4000, temperature=0.7))
                         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
                     except RuntimeError as e:
                         st.error(str(e))
