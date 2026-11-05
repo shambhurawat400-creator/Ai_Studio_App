@@ -148,7 +148,7 @@ def stream_ai_with_fallback(messages, max_tokens=4000, temperature=0.7):
                 _backoff_sleep(attempt)
 
     stream_ai_with_fallback.last_error = str(last_error) if last_error else "Unknown error"
-    raise RuntimeError(_friendly_error(last_error) if last_error else "Sabhi AI providers fail ہو gaye.")
+    raise RuntimeError(_friendly_error(last_error) if last_error else "Sabhi AI providers fail ho gaye.")
 
 
 def sanitize_filename(text: str) -> str:
@@ -401,8 +401,7 @@ def _render_chatbot():
             chat_export = "\n\n".join(
                 f"**{m['role'].upper()}:** {m['content']}" for m in st.session_state.messages
             )
-            st.download_button("📥 Export Chat", data=chat_export, file_name="chat_export.md",
-                                file_name="chat_export.md", mime="text/markdown")
+            st.download_button("📥 Export Chat", data=chat_export, file_name="chat_export.md", mime="text/markdown")
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
