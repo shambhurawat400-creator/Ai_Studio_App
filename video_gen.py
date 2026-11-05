@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/init/env python3
 """
 Video Generation & Editing Module — GEMINI OMNI FLASH REAL-TIME PROGRESS
 """
@@ -77,7 +77,7 @@ def download_video_bytes(uri):
     return client.files.download(file=uri)
 
 # ---------------------------------------------------------------------------
-# Streamlit UI Integration with Real-Time 16:9 Progress Frame
+# Streamlit UI Integration with Real-Time 16:9 Progress Frame & Status
 # ---------------------------------------------------------------------------
 
 def render_video_page():
@@ -117,7 +117,7 @@ def render_video_page():
             st.warning("कृपया पहले वीडियो का प्रॉम्प्ट दर्ज करें!")
             return
 
-        # Real-time status container inside 16:9 Frame
+        # Real-time status container inside 16:9 Frame & st.status wrapper
         frame_container.markdown(
             """
             <div style="width: 100%; aspect-ratio: 16/9; background-color: #1a1c24; border: 2px solid #ff4b4b; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffffff; font-family: sans-serif;">
@@ -128,42 +128,43 @@ def render_video_page():
             unsafe_allow_html=True
         )
 
-        progress_bar = st.progress(50, text="वीडियो सर्वर पर प्रोसेस हो रहा है...")
-
-        try:
-            # Direct backend API call
-            video_uri = generate_video_interaction(
-                prompt=prompt,
-                aspect_ratio=aspect_ratio,
-                duration=duration_sec,
-                resolution=resolution
-            )
+        with st.status("वीडियो सर्वर पर प्रोसेस हो रहा है...", expanded=True) as status:
+            try:
+                st.write("⏳ Gemini Omni Flash model ko request bheji ja rahi hai...")
+                
+                # Direct backend API call
+                video_uri = generate_video_interaction(
+                    prompt=prompt,
+                    aspect_ratio=aspect_ratio,
+                    duration=duration_sec,
+                    resolution=resolution
+                )
+                
+                st.write("📥 Video download kiya ja raha hai...")
+                video_bytes = download_video_bytes(video_uri)
+                
+                status.update(label="वीडियो सफलतापर्वक तैयार हो गया है! ✅", state="complete", expanded=False)
+            except Exception as e:
+                status.update(label="Video generation fail ho gaya ❌", state="error", expanded=True)
+                frame_container.markdown(
+                    """
+                    <div style="width: 100%; aspect-ratio: 16/9; background-color: #1a1c24; border: 2px solid #ff4b4b; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #ff4b4b;">
+                        Generation Failed ❌
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                st.error(f"Error: {sanitize_error(e)}")
+                return
             
-            progress_bar.progress(100, text="वीडियो सफलतापर्वक तैयार हो गया है! ✅")
-            time.sleep(0.3)
-            progress_bar.empty()
-            
-            # Download and display final video inside the 16:9 container frame
-            video_bytes = download_video_bytes(video_uri)
-            
-            with frame_container.container():
-                st.video(video_bytes)
-            
-            st.success("वीडियो सफलतापूर्वक जनरेट हो गया है! ✅")
-            st.download_button(
-                label="📥 Download Video (.mp4)",
-                data=video_bytes,
-                file_name="gemini_generated_video.mp4",
-                mime="video/mp4"
-            )
-        except Exception as e:
-            progress_bar.empty()
-            frame_container.markdown(
-                """
-                <div style="width: 100%; aspect-ratio: 16/9; background-color: #1a1c24; border: 2px solid #ff4b4b; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #ff4b4b;">
-                    Generation Failed ❌
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            st.error(f"Error: {sanitize_error(e)}")
+        # Display final video inside the 16:9 container frame
+        with frame_container.container():
+            st.video(video_bytes)
+        
+        st.success("वीडियो सफलतापूर्वक जनरेट हो गया है! ✅")
+        st.download_button(
+            label="📥 Download Video (.mp4)",
+            data=video_bytes,
+            file_name="gemini_generated_video.mp4",
+            mime="video/mp4"
+        )
