@@ -1,5 +1,5 @@
 """
-AI Video & Story Script Writer & Chatbot Hub — PRO EDITION (Triple Fallback: Groq -> GitHub -> OpenRouter)
+AI Video & Story Script Writer & Chatbot Hub — PRO EDITION (Dual Fallback: Groq -> GitHub)
 """
 
 import io
@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 GROQ_MODEL_NAME = "llama-3.1-8b-instant"
 GITHUB_MODEL_NAME = "openai/gpt-4o-mini"
 GITHUB_MODELS_ENDPOINT = "https://models.inference.ai.azure.com"
-OPENROUTER_MODEL_NAME = "meta-llama/llama-3.1-8b-instruct"
-OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1"
 
 MAX_CHAT_HISTORY_MESSAGES = 20
 MAX_RETRIES_PER_PROVIDER = 2
@@ -26,7 +24,7 @@ BASE_BACKOFF_SECONDS = 1.2
 
 
 # ---------------------------------------------------------------------------
-# Client setup (Groq, GitHub Models, OpenRouter)
+# Client setup (Groq, GitHub Models)
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
@@ -67,25 +65,6 @@ def get_github_client() -> OpenAI | None:
         return None
 
 
-@st.cache_resource(show_spinner=False)
-def get_openrouter_client() -> OpenAI | None:
-    import os
-    token = None
-    try:
-        token = st.secrets.get("OPENROUTER_API_KEY")
-    except Exception:
-        pass
-    if not token:
-        token = os.environ.get("OPENROUTER_API_KEY", "")
-    if not token:
-        return None
-    try:
-        return OpenAI(base_url=OPENROUTER_ENDPOINT, api_key=token)
-    except Exception as e:
-        logger.error("Failed to init OpenRouter client: %s", e)
-        return None
-
-
 # ---------------------------------------------------------------------------
 # Retry / backoff helpers
 # ---------------------------------------------------------------------------
@@ -114,31 +93,28 @@ def _friendly_error(e: Exception) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Streaming call with Triple Fallback
+# Streaming call with Dual Fallback (Groq -> GitHub)
 # ---------------------------------------------------------------------------
 
 def stream_ai_with_fallback(messages, max_tokens=4000, temperature=0.7):
     groq_client = get_groq_client()
     github_client = get_github_client()
-    openrouter_client = get_openrouter_client()
     
     stream_ai_with_fallback.last_provider = None
     stream_ai_with_fallback.last_error = None
 
-    if not groq_client and not github_client and not openrouter_client:
-        stream_ai_with_fallback.last_error = "Koi bhi API Key (Groq / GitHub / OpenRouter) set nahi hai."
+    if not groq_client and not github_client:
+        stream_ai_with_fallback.last_error = "Koi bhi API Key (Groq / GitHub) set nahi hai."
         raise RuntimeError(stream_ai_with_fallback.last_error)
 
     providers = []
     if groq_client:
-        providers.append(("Groq", groq_client, GROQ_MODEL_NAME, False))
+        providers.append(("Groq", groq_client, GROQ_MODEL_NAME))
     if github_client:
-        providers.append(("GitHub Models", github_client, GITHUB_MODEL_NAME, False))
-    if openrouter_client:
-        providers.append(("OpenRouter", openrouter_client, OPENROUTER_MODEL_NAME, True))
+        providers.append(("GitHub Models", github_client, GITHUB_MODEL_NAME))
 
     last_error = None
-    for name, client, model, is_or in providers:
+    for name, client, model in providers:
         yielded_anything = False
         for attempt in range(MAX_RETRIES_PER_PROVIDER):
             try:
@@ -149,11 +125,6 @@ def stream_ai_with_fallback(messages, max_tokens=4000, temperature=0.7):
                     "temperature": temperature, 
                     "stream": True,
                 }
-                if is_or:
-                    kwargs["extra_headers"] = {
-                        "HTTP-Referer": "https://streamlit.io",
-                        "X-Title": "AI Studio Hub",
-                    }
 
                 stream = client.chat.completions.create(**kwargs)
                 for chunk in stream:
@@ -177,7 +148,7 @@ def stream_ai_with_fallback(messages, max_tokens=4000, temperature=0.7):
                 _backoff_sleep(attempt)
 
     stream_ai_with_fallback.last_error = str(last_error) if last_error else "Unknown error"
-    raise RuntimeError(_friendly_error(last_error) if last_error else "Sabhi AI providers fail ho gaye.")
+    raise RuntimeError(_friendly_error(last_error) if last_error else "Sabhi AI providers fail ہو gaye.")
 
 
 def sanitize_filename(text: str) -> str:
@@ -212,15 +183,13 @@ def render_script_page(groq_client=None):
 
     groq_ok = bool(get_groq_client())
     github_ok = bool(get_github_client())
-    openrouter_ok = bool(get_openrouter_client())
 
-    if not groq_ok and not github_ok and not openrouter_ok:
+    if not groq_ok and not github_ok:
         st.error("🚨 Koi bhi API Key set nahi hai. Kam se kam ek secret set karna zaroori hai.")
     else:
         status = []
         status.append("✅ Groq" if groq_ok else "⚠️ Groq off")
         status.append("✅ GitHub Models" if github_ok else "⚠️ GitHub off")
-        status.append("✅ OpenRouter" if openrouter_ok else "⚠️ OpenRouter off")
         st.caption(" | ".join(status))
 
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
@@ -433,7 +402,7 @@ def _render_chatbot():
                 f"**{m['role'].upper()}:** {m['content']}" for m in st.session_state.messages
             )
             st.download_button("📥 Export Chat", data=chat_export, file_name="chat_export.md",
-                                mime="text/markdown")
+                                file_name="chat_export.md", mime="text/markdown")
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
