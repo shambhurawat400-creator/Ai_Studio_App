@@ -14,7 +14,7 @@ from google.genai import errors
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL_NAME = "gemini-3.0-flash"
+GEMINI_MODEL_NAME = "gemini-2.0-flash"
 
 MAX_CHAT_HISTORY_MESSAGES = 20
 
