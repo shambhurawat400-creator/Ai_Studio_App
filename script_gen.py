@@ -1,5 +1,5 @@
 """
-AI Video & Story Script Writer & Chatbot Hub — GEMINI EDITION
+AI Video & Story Script Writer & Chatbot Hub — INTERACTIONS API EDITION
 """
 
 import io
@@ -14,13 +14,13 @@ from google.genai import errors
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL_NAME = "gemini-1.5-flash"
+GEMINI_MODEL_NAME = "gemini-3.8-flash"
 
 MAX_CHAT_HISTORY_MESSAGES = 20
 
 
 # ---------------------------------------------------------------------------
-# Gemini Client Setup
+# Gemini Client Setup (Interactions API ready)
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
@@ -43,15 +43,16 @@ def get_gemini_client() -> genai.Client | None:
 
 
 # ---------------------------------------------------------------------------
-# Streaming call with Gemini
+# Streaming call with Interactions API
 # ---------------------------------------------------------------------------
 
-def stream_gemini_response(messages, max_tokens=4000, temperature=0.7):
+def stream_gemini_response(messages, max_tokens=4000, temperature=0.7, previous_interaction_id=None):
     client = get_gemini_client()
     if not client:
         raise RuntimeError("Gemini API Key set nahi hai! Streamlit Secrets mein GEMINI_API_KEY add karein.")
 
-    contents = []
+    # Format input contents and system instructions
+    input_parts = []
     system_instruction = None
     
     for msg in messages:
@@ -60,30 +61,36 @@ def stream_gemini_response(messages, max_tokens=4000, temperature=0.7):
         if role == "system":
             system_instruction = content
         elif role == "user":
-            contents.append(f"User: {content}")
+            input_parts.append({"type": "text", "text": f"User: {content}"})
         elif role == "assistant":
-            contents.append(f"Model: {content}")
+            input_parts.append({"type": "text", "text": f"Model: {content}"})
 
     try:
-        config = {
-            "temperature": temperature,
-            "max_output_tokens": max_tokens,
+        create_kwargs = {
+            "model": GEMINI_MODEL_NAME,
+            "input": input_parts,
+            "stream": True,
         }
         if system_instruction:
-            config["system_instruction"] = system_instruction
+            create_kwargs["system_instruction"] = system_instruction
+        if previous_interaction_id:
+            create_kwargs["previous_interaction_id"] = previous_interaction_id
 
-        response = client.models.generate_content_stream(
-            model=GEMINI_MODEL_NAME,
-            contents="\n".join(contents),
-            config=config,
-        )
+        response = client.interactions.create(**create_kwargs)
         
         for chunk in response:
-            if chunk.text:
+            # Handle streaming steps delta format for Interactions API
+            if hasattr(chunk, "step") and chunk.step and hasattr(chunk.step, "delta"):
+                delta_content = chunk.step.delta
+                if delta_content:
+                    for part in delta_content:
+                        if hasattr(part, "text") and part.text:
+                            yield part.text
+            elif hasattr(chunk, "text") and chunk.text:
                 yield chunk.text
                 
     except Exception as e:
-        logger.error("Gemini generation error: %s", e)
+        logger.error("Gemini Interactions generation error: %s", e)
         raise RuntimeError(f"Gemini Error: {str(e)}")
 
 
@@ -114,7 +121,7 @@ def export_docx_bytes(title: str, body: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 def render_script_page(groq_client=None):
-    st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub — Gemini Pro")
+    st.subheader("📜 AI Video & Story Script Writer & Chatbot Hub — Gemini 3.8 Flash")
     st.write("यहाँ से आप यूट्यूब, शॉर्ट्स या लंबी कहानियों के लिए स्क्रिप्ट तैयार कर सकते हैं और AI चैटबॉट से बात कर सकते हैं:")
 
     gemini_ok = bool(get_gemini_client())
@@ -122,7 +129,7 @@ def render_script_page(groq_client=None):
     if not gemini_ok:
         st.error("🚨 GEMINI_API_KEY set nahi hai. Kripya Streamlit Secrets mein apni Gemini API key save karein.")
     else:
-        st.caption("✅ Powered by Google Gemini")
+        st.caption("✅ Powered by Google Gemini Interactions API")
 
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
 
@@ -267,7 +274,7 @@ def _render_script_writer():
             )
             progress.progress(1.0, text="पूरा हुआ! ✅")
             st.session_state.script_history.append({
-                "title": topic, "script": full_script, "provider": "Google Gemini",
+                "title": topic, "script": full_script, "provider": "Google Gemini (Interactions API)",
             })
         except RuntimeError:
             return
@@ -300,7 +307,7 @@ def _render_script_writer():
             with st.expander(f"📚 पिछली scripts ({len(st.session_state.script_history) - 1})"):
                 for idx, item in enumerate(reversed(st.session_state.script_history[:-1])):
                     st.write(f"**{item['title']}**")
-                    st.text_area("", value=item["script"], height=150, key=f"hist_{idx}", label_visibility="collapsed")
+                    st.text_update = st.text_area("", value=item["script"], height=150, key=f"hist_{idx}", label_visibility="collapsed")
 
 
 # ---------------------------------------------------------------------------
