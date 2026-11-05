@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video Generation & Editing Module — GEMINI OMNI FLASH EDITION WITH LIVE PROGRESS
+Video Generation & Editing Module — GEMINI OMNI FLASH REAL-TIME PROGRESS
 """
 
 import os
@@ -58,7 +58,7 @@ def generate_video_interaction(prompt, aspect_ratio="16:9", duration="10s", reso
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY set nahi hai!")
     
-    client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=600 * 1000))
+    client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=900 * 1000))
     input_parts = [{"type": "text", "text": prompt}]
     video_config = {"type": "video", "delivery": "uri", "aspect_ratio": aspect_ratio, "duration": duration, "resolution": resolution}
     
@@ -77,7 +77,7 @@ def download_video_bytes(uri):
     return client.files.download(file=uri)
 
 # ---------------------------------------------------------------------------
-# Streamlit UI Integration with 16:9 Live Percentage Progress Frame
+# Streamlit UI Integration with Real-Time 16:9 Progress Frame
 # ---------------------------------------------------------------------------
 
 def render_video_page():
@@ -103,7 +103,6 @@ def render_video_page():
     st.markdown("### 🖼️ Preview Frame (16:9)")
     frame_container = st.empty()
 
-    # Default empty or placeholder box inside 16:9 ratio wrapper
     frame_container.markdown(
         """
         <div style="width: 100%; aspect-ratio: 16/9; background-color: #0e1117; border: 2px dashed #30333d; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #808495;">
@@ -118,25 +117,21 @@ def render_video_page():
             st.warning("कृपया पहले वीडियो का प्रॉम्प्ट दर्ज करें!")
             return
 
-        # Live Percentage Progress Simulation inside 16:9 Frame
-        progress_bar = st.progress(0, text="वीडियो जनरेशन शुरू हो रहा है... 0%")
-        
-        try:
-            # Simulated smooth percentage ticks while background API processes
-            for pct in range(10, 90, 15):
-                time.sleep(1.2)
-                progress_bar.progress(pct, text=f"वीडियो तैयार हो रहा है... {pct}%")
-                frame_container.markdown(
-                    f"""
-                    <div style="width: 100%; aspect-ratio: 16/9; background-color: #1a1c24; border: 2px solid #ff4b4b; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffffff; font-family: sans-serif;">
-                        <h3 style="margin: 0; color: #ff4b4b;">Processing... {pct}%</h3>
-                        <p style="margin: 5px 0 0 0; font-size: 14px; color: #a3a8b8;">Gemini Omni Flash rendering video</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+        # Real-time status container inside 16:9 Frame
+        frame_container.markdown(
+            """
+            <div style="width: 100%; aspect-ratio: 16/9; background-color: #1a1c24; border: 2px solid #ff4b4b; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffffff; font-family: sans-serif;">
+                <h3 style="margin: 0; color: #ff4b4b;">Generating Video...</h3>
+                <p style="margin: 5px 0 0 0; font-size: 14px; color: #a3a8b8;">Gemini Omni Flash is rendering your scene. Please wait...</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-            # Actual API Call
+        progress_bar = st.progress(50, text="वीडियो सर्वर पर प्रोसेस हो रहा है...")
+
+        try:
+            # Direct backend API call
             video_uri = generate_video_interaction(
                 prompt=prompt,
                 aspect_ratio=aspect_ratio,
@@ -144,8 +139,8 @@ def render_video_page():
                 resolution=resolution
             )
             
-            progress_bar.progress(100, text="वीडियो सफलतापर्वक तैयार हो गया है! 100%")
-            time.sleep(0.5)
+            progress_bar.progress(100, text="वीडियो सफलतापर्वक तैयार हो गया है! ✅")
+            time.sleep(0.3)
             progress_bar.empty()
             
             # Download and display final video inside the 16:9 container frame
@@ -163,4 +158,12 @@ def render_video_page():
             )
         except Exception as e:
             progress_bar.empty()
+            frame_container.markdown(
+                """
+                <div style="width: 100%; aspect-ratio: 16/9; background-color: #1a1c24; border: 2px solid #ff4b4b; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #ff4b4b;">
+                    Generation Failed ❌
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
             st.error(f"Error: {sanitize_error(e)}")
