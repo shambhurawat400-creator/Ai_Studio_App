@@ -20,7 +20,7 @@ MAX_CHAT_HISTORY_MESSAGES = 20
 
 
 # ---------------------------------------------------------------------------
-# Gemini Client Setup (Interactions API ready)[span_0](start_span)[span_0](end_span)
+# Gemini Client Setup (Interactions API ready)
 # ---------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False)
@@ -43,7 +43,7 @@ def get_gemini_client() -> genai.Client | None:
 
 
 # ---------------------------------------------------------------------------
-# Fast Streaming call with Interactions API[span_1](start_span)[span_1](end_span)
+# Robust Fast Streaming call with Interactions API
 # ---------------------------------------------------------------------------
 
 def stream_gemini_response(messages, max_tokens=8000, temperature=0.7, previous_interaction_id=None):
@@ -78,14 +78,21 @@ def stream_gemini_response(messages, max_tokens=8000, temperature=0.7, previous_
         response = client.interactions.create(**create_kwargs)
         
         for chunk in response:
-            if hasattr(chunk, "step") and chunk.step and hasattr(chunk.step, "delta"):
-                delta_content = chunk.step.delta
-                if delta_content:
-                    for part in delta_content:
+            text_piece = None
+            if hasattr(chunk, "text") and chunk.text:
+                text_piece = chunk.text
+            elif hasattr(chunk, "step") and chunk.step:
+                if hasattr(chunk.step, "delta") and chunk.step.delta:
+                    for part in chunk.step.delta:
                         if hasattr(part, "text") and part.text:
                             yield part.text
-            elif hasattr(chunk, "text") and chunk.text:
-                yield chunk.text
+                elif hasattr(chunk.step, "content") and chunk.step.content:
+                    for part in chunk.step.content:
+                        if hasattr(part, "text") and part.text:
+                            yield part.text
+            
+            if text_piece:
+                yield text_piece
                 
     except Exception as e:
         logger.error("Gemini Interactions generation error: %s", e)
@@ -127,7 +134,7 @@ def render_script_page(groq_client=None):
     if not gemini_ok:
         st.error("🚨 GEMINI_API_KEY set nahi hai. Kripya Streamlit Secrets mein apni Gemini API key save karein.")
     else:
-        st.caption("✅ Powered by Google Gemini Flash-Lite (Interactions API)[span_2](start_span)[span_2](end_span)")
+        st.caption("✅ Powered by Google Gemini Flash-Lite (Interactions API)")
 
     app_mode = st.radio("फीचर चुनें:", ["✍️ Pro Script Writer", "💬 AI Assistant Chatbot"], horizontal=True)
 
