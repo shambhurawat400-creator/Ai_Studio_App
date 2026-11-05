@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 GROQ_MODEL_NAME = "llama-3.1-8b-instant"
 GITHUB_MODEL_NAME = "openai/gpt-4o-mini"
-GITHUB_MODELS_ENDPOINT = "https://models.inference.ai.azure.com"
+# Correct endpoint with /v1 for OpenAI client compatibility
+GITHUB_MODELS_ENDPOINT = "https://models.inference.ai.azure.com/v1"
 
 MAX_CHAT_HISTORY_MESSAGES = 20
 MAX_RETRIES_PER_PROVIDER = 2
@@ -84,7 +85,7 @@ def _backoff_sleep(attempt: int):
 def _friendly_error(e: Exception) -> str:
     msg = str(e).lower()
     if isinstance(e, APIConnectionError) or "connection error" in msg:
-        return "Network connection error: API server tak request nahi pahunch pa rahi hai. Apna internet connection ya API endpoint check karein."
+        return "Network Connection Error: GitHub AI endpoint se connect nahi ho pa raha hai. Please check karein ki aapke Streamlit Secrets mein GROQ_API_KEY bhi dali ho taaki app Groq se chal sake."
     if _is_auth_error(e):
         return "API key invalid ya expire ho gayi hai — st.secrets me keys check karo."
     if "rate limit" in msg or "429" in msg:
