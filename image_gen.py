@@ -122,10 +122,7 @@ def generate_with_huggingface(prompt: str, negative_prompt: str, model_id: str, 
     """
     Returns (image_bytes_or_None, error_message_or_None, model_actually_used_or_None).
     Uses the official huggingface_hub client (handles HF's Inference
-    Providers routing/auth correctly — raw REST calls to the old
-    api-inference.huggingface.co endpoint no longer work).
-    If the requested model is gated/inaccessible, automatically falls back
-    to FLUX.1-schnell (ungated) so the user doesn't hit a hard failure.
+    Providers routing/auth correctly).
     """
     hf_key = get_hf_api_key()
     if not hf_key:
@@ -173,7 +170,7 @@ def generate_with_huggingface(prompt: str, negative_prompt: str, model_id: str, 
                 is_access_error = any(s in str(e).lower() for s in ["gated", "403", "not authorized", "access"])
                 logger.warning("HF attempt failed: %s", last_error)
                 if is_access_error:
-                    break  # don't retry the same gated model, move to fallback model immediately
+                    break  
                 time.sleep(3)
 
     return None, last_error, None
@@ -189,9 +186,6 @@ def stable_seed_from_name(name: str, salt: int = 0) -> int:
 
 
 def build_pollinations_url(prompt: str, neg_prompt: str, width: int, height: int, seed: int) -> str:
-    # Note: `prompt` already includes style/quality tags from the caller — don't add more here,
-    # since a bloated prompt dilutes attention on the specific scene (characters, count, setting)
-    # and free models like this one have weaker prompt adherence to begin with.
     encoded_prompt = urllib.parse.quote(prompt)
     encoded_neg = urllib.parse.quote(neg_prompt)
     boosted_width = min(int(width * 1.15), MAX_DIMENSION)
@@ -222,7 +216,7 @@ def short_hash(data: bytes) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Persistent saved projects (Supabase-backed, per user — survives reloads/logins)
+# Persistent saved projects (Supabase-backed, per user)
 # ---------------------------------------------------------------------------
 
 def save_project_to_supabase(supabase, user, prompt: str, character: str, style: str, img_bytes: bytes) -> bool:
@@ -238,7 +232,7 @@ def save_project_to_supabase(supabase, user, prompt: str, character: str, style:
     except Exception as e:
         st.error(
             f"🚨 Save nahi ho paya: {e}\n\n"
-            "Supabase mein `saved_image_projects` table honi chahiye (SQL neeche di hai)."
+            "Supabase mein `saved_image_projects` table honi chahiye."
         )
         return False
 
@@ -260,7 +254,7 @@ def load_saved_projects_from_supabase(supabase, user) -> list:
                 continue
         return projects
     except Exception as e:
-        logger.info("Could not load saved_image_projects (table may not exist yet): %s", e)
+        logger.info("Could not load saved_image_projects: %s", e)
         return []
 
 
@@ -303,11 +297,11 @@ def render_image_page(supabase=None, user=None):
     if provider_choice in (PROVIDER_AUTO, PROVIDER_HF) and hf_available:
         hf_quality_label = st.selectbox(
             "🧠 Hugging Face Quality:", list(HF_MODEL_OPTIONS.keys()),
-            index=1, help="Best Quality (dev) prompts ko zyada sahi follow karta hai, khaas kar multiple characters wali scenes mein.",
+            index=1, help="Best Quality (dev) prompts ko zyada sahi follow karta hai.",
         )
         hf_model_choice = HF_MODEL_OPTIONS[hf_quality_label]
         if "dev" in hf_model_choice.lower():
-            st.caption("⚠️ FLUX.1-dev gated hai — pehli baar use karne se pehle [model page](https://huggingface.co/black-forest-labs/FLUX.1-dev) पर jaake license ek baar accept karna hoga.")
+            st.caption("⚠️ FLUX.1-dev gated hai — license accept karna zaroori hai.")
 
     if "image_history" not in st.session_state:
         st.session_state.image_history = []
@@ -318,14 +312,14 @@ def render_image_page(supabase=None, user=None):
 
     # --- Character Profile Manager ---
     with st.expander("🎭 Character Profile Manager (Consistency के लिए)", expanded=False):
-        st.write("Pehli image apne-aap reference ban jaayegi (Nano Banana ke liye) — future images usi look ko follow karengi:")
+        st.write("Pehli image apne-aap reference ban jaayegi:")
         char_name = st.text_input("कैरेक्टर का नाम:", placeholder="जैसे: Grandma Kamla")
         char_desc = st.text_area(
             "कैरेक्टर का पूरा विवरण:",
-            placeholder="60 year old Indian woman, curly grey hair, wrinkled kind face, faded pink saree, round glasses",
+            placeholder="60 year old Indian woman, curly grey hair, wrinkled kind face...",
             height=90,
         )
-        char_ref_upload = st.file_uploader("(Optional) खुद की reference image अपलोड करो:", type=["png", "jpg", "jpeg"])
+        char_ref_upload = st.file_uploader("(Optional) خود کی reference image अपलोड करो:", type=["png", "jpg", "jpeg"])
 
         if st.button("💾 Save Character"):
             if char_name.strip() and char_desc.strip():
@@ -353,18 +347,16 @@ def render_image_page(supabase=None, user=None):
 
     img_prompt = st.text_area(
         "✨ Prompt Box (मुख्य विवरण):",
-        placeholder="An old grandmother crying, a sad man reading a letter, village room, detailed faces...",
+        placeholder="An old grandmother crying, a sad man reading a letter...",
     )
 
     character_names = ["— कोई नहीं (No Character) —"] + [c["name"] for c in st.session_state.characters]
     selected_character_name = st.selectbox("🎭 Character चुनें (Consistency के लिए):", character_names)
 
     neg_prompt = st.text_area(
-        "🚫 Negative Prompt (चेहरा, आँखें और बैकग्राउंड साफ़ रखने के लिए):",
+        "🚫 Negative Prompt:",
         value="blurry, distorted face, asymmetrical face, low quality, bad anatomy, dark shadows, ugly, extra limbs, deformed hands, extra fingers, out of focus background, grainy, watermark, text, oversaturated, back view, from behind, rear view, back of head, turned away, faces hidden, looking away, walking away from camera, silhouette",
     )
-    st.caption("💡 Tip 1: 'four teenage boys' jaisa count likhna naamon (Rahul, Sonu...) se zyada reliably सही number of log dikhayega.")
-    st.caption("💡 Tip 2: Hugging Face mein complex/multi-character scenes ke liye 'Best Quality (FLUX.1-dev)' chuno — 'Fast (schnell)' speed ke liye bana hai, detailed instructions utni achhi tarah follow nahi karta.")
 
     st.markdown("### 🎭 Style Selection (शैलियों का चयन)")
     style_option = st.selectbox("चुनें अपना पसंदीदा आर्ट स्टाइल:", [
@@ -400,7 +392,7 @@ def render_image_page(supabase=None, user=None):
             st.warning("⚠️ कृपया पहले प्रॉम्प्ट बॉक्स में इमेज का विवरण (Prompt) दर्ज करें!")
             return
 
-        with st.spinner("🖼️ इमेज बन रही है... (कृपया प्रतीक्षा करें, HD/Ultra HD mein zyada time lag sakta hai)"):
+        with st.spinner("🖼️ इमेज बन रही है... (कृपया प्रतीक्षा करें)"):
             free_boost = "close-up detailed eyes with visible iris and catchlights, sharp detailed facial features, clean background, vibrant colors, high quality"
             style_tags_map = {
                 "Indian Storybook Illustration (बेस्ट)": f"Indian storybook illustration style, {free_boost}",
@@ -417,7 +409,7 @@ def render_image_page(supabase=None, user=None):
 
             clean_input = img_prompt.strip()
             prompt_parts = [
-                "cinematic movie poster style, posed group portrait, everyone standing together looking directly at the camera with clear detailed faces, front view, direct eye contact with viewer (not walking away, not a back view, not rear view, not turned away)",
+                "cinematic movie poster style, posed group portrait, everyone standing together looking directly at the camera with clear detailed faces, front view, direct eye contact with viewer",
                 clean_input,
             ]
             if character:
@@ -429,7 +421,6 @@ def render_image_page(supabase=None, user=None):
             final_prompt = ", ".join(prompt_parts)
             final_neg = neg_prompt.strip() if neg_prompt.strip() else "blurry, low quality"
 
-            # Which providers are allowed to be tried, in priority order, based on the radio choice
             if provider_choice == PROVIDER_AUTO:
                 try_order = ["nano_banana", "huggingface", "pollinations"]
             elif provider_choice == PROVIDER_NANO:
@@ -457,7 +448,7 @@ def render_image_page(supabase=None, user=None):
                         if not user_is_pro and supabase and user and check_and_consume_usage:
                             allowed, _ = check_and_consume_usage(supabase, user.id, "nano_banana", FREE_NANO_BANANA_DAILY_LIMIT)
                             if not allowed:
-                                err_msg = f"Free plan ki daily limit ({FREE_NANO_BANANA_DAILY_LIMIT} images) khatam ho gayi. Kal reset hogi, ya Upgrade to Pro se unlimited use karo."
+                                err_msg = f"Free plan ki daily limit khatam ho gayi."
                                 continue
                         ref_bytes = character.get("reference_image") if character else None
                         img_bytes, err_msg = generate_with_nano_banana(gemini_client, final_prompt, aspect_ratio_str, ref_bytes)
@@ -470,8 +461,6 @@ def render_image_page(supabase=None, user=None):
                         img_bytes, err_msg, model_used = generate_with_huggingface(final_prompt, final_neg, hf_model_choice, fallback_width, fallback_height)
                         if img_bytes:
                             provider = "Hugging Face (FLUX)"
-                            if model_used and "dev" not in model_used.lower() and "dev" in hf_model_choice.lower():
-                                provider += " — schnell pe auto-fallback (dev accessible nahi tha)"
 
                     elif step == "pollinations":
                         seed_val = stable_seed_from_name(selected_character_name, salt=i) if character else datetime.now().microsecond + i
@@ -484,7 +473,7 @@ def render_image_page(supabase=None, user=None):
 
             success_count = sum(1 for g in generated if g["bytes"] is not None)
             if success_count == 0:
-                st.error("🚨 कोई भी इमेज generate नहीं हो पाई। API keys check karo ya thodi der baad try karo.")
+                st.error("🚨 कोई भी इमेज generate नहीं हो पाई। API keys check karo.")
             else:
                 st.success(f"✨ {success_count}/{num_images} इमेज तैयार हैं!")
 
@@ -508,7 +497,7 @@ def render_image_page(supabase=None, user=None):
                         if st.button(f"💾 Save Project #{idx + 1}", key=f"save_{idx}_{h}"):
                             if supabase and user:
                                 if save_project_to_supabase(supabase, user, img_prompt, selected_character_name, style_option, img_bytes):
-                                    st.success("📁 प्रोजेक्ट permanently सेव हो गया — ye अगली बार login karne par bhi dikhega!")
+                                    st.success("📁 प्रोजेक्ट permanently सेव हो गया!")
                             else:
                                 st.session_state.saved_projects.append({
                                     "prompt": img_prompt,
@@ -516,14 +505,12 @@ def render_image_page(supabase=None, user=None):
                                     "style": style_option,
                                     "image": img_bytes,
                                 })
-                                st.success("📁 प्रोजेक्ट सेव हो गया (is session ke liye).")
+                                st.success("📁 प्रोजेक्ट सेव हो गया।")
                     else:
                         st.warning(f"⚠️ Image #{idx + 1} generate नहीं हो पाई।")
                         if err_msg:
                             with st.expander("❌ Error Details"):
                                 st.code(err_msg)
-                        if url:
-                            st.markdown(f"[🔗 Direct link try karo]({url})")
 
             if success_count > 0:
                 first_ok = next(g for g in generated if g["bytes"] is not None)
@@ -556,7 +543,5 @@ def render_image_page(supabase=None, user=None):
                 st.image(hist["image"], width=250)
                 st.write("---")
         else:
-            st.info("इतिहास (History) खाली है।")    
-    st.write("Studio ready hai! Prompt daalo aur generate karo.")
-
-# Note: Aap ise apne main.py ya jahan bhi use kar rahe hain, wahan replace kar sakte hain.
+            st.info("इतिहास खाली है।")    
+    st.write("Studio ready hai!")
