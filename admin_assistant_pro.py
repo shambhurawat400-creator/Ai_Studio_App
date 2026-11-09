@@ -13,6 +13,7 @@ the live app.
 
 import json
 import logging
+import re
 
 import streamlit as st
 
@@ -196,15 +197,21 @@ def render_admin_assistant_page(supabase, groq_client) -> None:
                 messages.append({"role": m["role"], "content": m["content"]})
 
             response = groq_client.chat.completions.create(
-                model="llama-3.1-8b-instant",
+                model="llama-3.3-70b-versatile",
                 messages=messages,
                 max_tokens=500,
                 temperature=0.3,
             )
             raw = response.choices[0].message.content.strip()
-            raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            
+            # Robust JSON extraction using regex to handle any surrounding text or markdown
+            match = re.search(r"\{.*\}", raw, re.DOTALL)
+            if match:
+                json_str = match.group(0)
+                parsed = json.loads(json_str)
+            else:
+                raise json.JSONDecodeError("No JSON object found in response", raw, 0)
 
-            parsed = json.loads(raw)
             reply = parsed.get("reply", "Samajh nahi aaya, dobara try karo.")
 
             with st.chat_message("assistant"):
