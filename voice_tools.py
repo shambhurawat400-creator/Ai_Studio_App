@@ -14,10 +14,14 @@ if not os.path.exists(CLONED_VOICES_DIR):
     os.makedirs(CLONED_VOICES_DIR)
 
 class StudioAudioEnhancer:
-    """Applies clean text formatting without breathing or interruption effects."""
+    """Applies clean text formatting and natural pauses for breathing or emotional tone."""
     
     @staticmethod
     def apply_smart_pauses_and_breathing(text: str, emotion: str) -> str:
+        if "Whisper" in emotion or "फुसफुसाहट" in emotion:
+            return text.replace(".", "... ").replace(",", ", ... ")
+        elif "Storytelling" in emotion or "भावुक" in emotion:
+            return text.replace(".", ". ... ").replace(",", ", ... ")
         return text
 
 def run_async(coro):
@@ -53,8 +57,10 @@ def generate_elevenlabs_audio(text, voice_id, output_file):
         "text": text,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75
+            "stability": 0.45,         # Natural emotional variation aur breath/pauses ke liye balanced stability
+            "similarity_boost": 0.80,   # Voice clarity aur character consistency ke liye
+            "style": 0.20,              # Expressive style boost
+            "use_speaker_boost": True
         }
     }
     response = requests.post(url, json=data, headers=headers)
@@ -80,7 +86,7 @@ def clone_voice_to_elevenlabs(name, file_path):
     return None
 
 def get_elevenlabs_voices():
-    # प्रो लेवल कैरेक्टर्स: महिला, पुरुष, दादाजी, दादी/अम्मा, बच्चा, विलेन और भूतिया आवाज़ों के लिए विस्तृत IDs
+    # प्रो लेवल और नेचुरल कैरेक्टर्स: महिला, पुरुष, दादाजी, दादी/अम्मा, बच्चा, विलेन और भूतिया आवाज़ों के लिए विस्तृत IDs
     fallback_voices = {
         " Rachel (Professional Female - मुख्य महिला)": "21m00Tcm4TlvDq8ikWAM",
         " Dom (Deep Calm Male - गंभीर पुरुष)": "AZnzlk1XvdvUeBnXmlld",
@@ -103,7 +109,6 @@ def get_elevenlabs_voices():
             voices = response.json().get("voices", [])
             if voices:
                 api_voices = {v["name"]: v["voice_id"] for v in voices}
-                # API के साथ-साथ हमारे नए जोड़े गए स्पेशल कैरेक्टर्स को भी मिलाना ताकि लिस्ट हमेशा पूरी रहे
                 fallback_voices.update(api_voices)
     except Exception:
         pass
@@ -116,7 +121,7 @@ def render_voice_page():
     # --- ENGINE SELECTION (Free vs ElevenLabs) ---
     voice_engine_choice = str_lit.radio(
         "🎛️ वॉइस इंजन चुनें (Select Voice Engine):",
-        ["🆓 Free Built-in Studio Voices (अनलिमिटेड फ्री)", "🔥 ElevenLabs Premium & Cloned Voices (प्रोफेशनल)"],
+        ["🔥 ElevenLabs Premium & Cloned Voices (प्रोफेशनल और नेचुरल)", "🆓 Free Built-in Studio Voices (अनलिमिटेड फ्री)"],
         horizontal=True
     )
 
@@ -191,7 +196,35 @@ def render_voice_page():
     # --- SECTION 4: CHARACTER PROFILES DYNAMIC BASED ON SELECTION ---
     voice_profiles_map = {}
 
-    if "Free" in voice_engine_choice:
+    if "ElevenLabs" in voice_engine_choice:
+        try:
+            el_voices = get_elevenlabs_voices()
+            for el_name, el_id in el_voices.items():
+                voice_profiles_map[f"🔥 ElevenLabs Character - {el_name.strip()}"] = {
+                    "type": "elevenlabs", "voice_id": el_id, "sample_text": "Hello, this is a natural professional character voice with emotions and breathing pauses."
+                }
+        except:
+            pass
+
+        # आपके सेव किए गए कस्टम क्लोन कैरेक्टर्स को जोड़ना
+        try:
+            saved_clones = os.listdir(CLONED_VOICES_DIR)
+            el_voices_check = get_elevenlabs_voices()
+            for clone in saved_clones:
+                if clone.endswith(".mp3"):
+                    c_name = clone.replace(".mp3", "")
+                    matched_vid = el_voices_check.get(c_name, "21m00Tcm4TlvDq8ikWAM")
+                    voice_profiles_map[f"🧬 My Cloned Voice - {c_name}"] = {
+                        "type": "elevenlabs", "voice_id": matched_vid, "sample_text": f"नमस्ते, यह मेरा क्लोन किया हुआ कैरेक्टर {c_name} बोल रहा है।"
+                    }
+        except:
+            pass
+
+        if not voice_profiles_map:
+            voice_profiles_map["⚠️ No ElevenLabs Voice Found"] = {
+                "type": "edge", "voice": current_lang_voices["male_deep"], "pitch": "+0Hz", "rate": "+0%", "sample_text": "कोई आवाज़ नहीं मिली।"
+            }
+    else:
         voice_profiles_map = {
             f"1. 🇮🇳 {selected_language} - Swara (मुख्य नेचुरल महिला आवाज़)": {
                 "type": "edge", "voice": current_lang_voices["female"], "pitch": "+0Hz", "rate": "+0%", "sample_text": "नमस्ते, यह मेरी प्राकृतिक महिला आवाज़ का सैंपल है।"
@@ -213,61 +246,8 @@ def render_voice_page():
             },
             "7. 🧛 Evil Villain / Monster (खतरनाक खलनायक की आवाज़)": {
                 "type": "edge", "voice": "en-US-ChristopherNeural", "pitch": "-10Hz", "rate": "-8%", "sample_text": "You cannot escape from my trap now!"
-            },
-            "8. 🕵️‍♂️ Deep Mystery Narrator (सस्पेंस मिस्ट्री नरेटर)": {
-                "type": "edge", "voice": "en-US-BrianNeural", "pitch": "-6Hz", "rate": "-5%", "sample_text": "A dark secret was hidden behind the ancient walls."
-            },
-            "9. 👦 Young Energetic Boy (उत्साही युवा लड़का)": {
-                "type": "edge", "voice": "en-US-AndrewNeural", "pitch": "+6Hz", "rate": "+8%", "sample_text": "Hey guys, let's explore this amazing adventure!"
-            },
-            "10. 👧 Sweet Young Girl (मासूम और प्यारी बच्ची की पतली आवाज़)": {
-                "type": "edge", "voice": "en-US-AriaNeural", "pitch": "+12Hz", "rate": "+5%", "sample_text": "Dekho na bhaiya, kitni sundar titli hai yeh!"
-            },
-            "11. 🤖 Robotic Sci-Fi AI (रोबोटिक कंप्यूटर आवाज़)": {
-                "type": "edge", "voice": "en-US-ChristopherNeural", "pitch": "+0Hz", "rate": "+2%", "sample_text": "System online. Processing neural commands."
-            },
-            "12. 👑 Royal King / Emperor (शाही और रौबदार राजा की आवाज़)": {
-                "type": "edge", "voice": "en-US-BrianNeural", "pitch": "-9Hz", "rate": "-10%", "sample_text": "Humare samrajya mein aapka swagat hai."
-            },
-            "13. 🧚 Fairy Tale Princess (परी कथा वाली जादुई आवाज़)": {
-                "type": "edge", "voice": "en-US-AriaNeural", "pitch": "+8Hz", "rate": "+3%", "sample_text": "Once upon a time in a magical kingdom far away."
-            },
-            "14. 🧙‍♂️ Ancient Wizard / Sage (प्राचीन जादूगर की रहस्यमयी आवाज़)": {
-                "type": "edge", "voice": "en-GB-RyanNeural", "pitch": "-14Hz", "rate": "-22%", "sample_text": "Ancient spells are awakened by secret words."
-            },
-            "15. 🦸 Action Superhero (धांसू और दमदार सुपरहीरो आवाज़)": {
-                "type": "edge", "voice": "en-US-AndrewNeural", "pitch": "-3Hz", "rate": "+5%", "sample_text": "Justice will be served today. Fear not!"
             }
         }
-    else:
-        # ElevenLabs & Custom Cloned Voices Integration (अब इसमें दादाजी, दादी, बच्चे, विलेन आदि के विकल्प शामिल हैं)
-        try:
-            el_voices = get_elevenlabs_voices()
-            for el_name, el_id in el_voices.items():
-                voice_profiles_map[f"🔥 ElevenLabs Voice - {el_name}"] = {
-                    "type": "elevenlabs", "voice_id": el_id, "sample_text": "Hello, this is a professional character voice sample."
-                }
-        except:
-            pass
-
-        # आपके सेव किए गए कस्टम क्लोन कैरेक्टर्स को लिस्ट में जोड़ना
-        try:
-            saved_clones = os.listdir(CLONED_VOICES_DIR)
-            el_voices_check = get_elevenlabs_voices()
-            for clone in saved_clones:
-                if clone.endswith(".mp3"):
-                    c_name = clone.replace(".mp3", "")
-                    matched_vid = el_voices_check.get(c_name, "21m00Tcm4TlvDq8ikWAM")
-                    voice_profiles_map[f"🧬 My Cloned Voice - {c_name}"] = {
-                        "type": "elevenlabs", "voice_id": matched_vid, "sample_text": f"नमस्ते, यह मेरा क्लोन किया हुआ कैरेक्टर {c_name} बोल रहा है।"
-                    }
-        except:
-            pass
-
-        if not voice_profiles_map:
-            voice_profiles_map["⚠️ No ElevenLabs/Cloned Voice Found"] = {
-                "type": "edge", "voice": current_lang_voices["male_deep"], "pitch": "+0Hz", "rate": "+0%", "sample_text": "कोई क्लोन आवाज़ नहीं मिली।"
-            }
 
     voice_profiles = list(voice_profiles_map.keys())
 
@@ -309,17 +289,14 @@ def render_voice_page():
 
     if str_lit.button("Generate Master Character Audio 🔊✨", type="primary", use_container_width=True):
         if audio_text.strip():
-            with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में स्क्रिप्ट से नई आवाज़ तैयार हो रही है..."):
+            with str_lit.spinner(f"🎙️ '{selected_character}' के रूप में स्क्रिप्ट से नेचुरल आवाज़ तैयार हो रही है..."):
                 try:
                     config = voice_profiles_map.get(selected_character)
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"master_audio_{timestamp}.mp3"
 
                     if config["type"] == "elevenlabs":
-                        try:
-                            generate_elevenlabs_audio(audio_text, config["voice_id"], filename)
-                        except Exception:
-                            run_async(generate_edge_audio_with_emotion(audio_text, current_lang_voices["male_deep"], filename, emotion=audio_emotion))
+                        generate_elevenlabs_audio(audio_text, config["voice_id"], filename)
                     else:
                         voice_id = config["voice"]
                         base_rate_num = int(config["rate"].replace("+", "").replace("%", ""))
