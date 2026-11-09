@@ -1,5 +1,5 @@
 """
-Admin AI Assistant (Pro Version)
+Admin AI Assistant (Gemini Powered Version)
 ------------------------------------
 Visible ONLY to the configured admin email.
 """
@@ -8,10 +8,12 @@ import json
 import logging
 import re
 import streamlit as st
+from google import genai
 
 logger = logging.getLogger(__name__)
 
 ADMIN_EMAIL = "shambhurawat400@gmail.com"
+GEMINI_MODEL_NAME = "gemini-3.5-flash-lite"
 
 FEATURE_KEYS = {
     "chatbot": "💬 AI Chatbot",
@@ -40,6 +42,23 @@ Schema:
 2. {{"action": "set_feature_flag", "feature": "<chatbot|script|voice|image|video>", "enabled": true/false, "reply": "<short explanation>"}}
 3. {{"action": "none", "reply": "<your reply>"}}
 """
+
+def get_gemini_client():
+    import os
+    api_key = None
+    try:
+        api_key = st.secrets.get("GEMINI_API_KEY")
+    except Exception:
+        pass
+    if not api_key:
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        return genai.Client(api_key=api_key)
+    except Exception as e:
+        logger.error("Failed to init Gemini client: %s", e)
+        return None
 
 def is_admin(user) -> bool:
     return bool(user) and getattr(user, "email", "").strip().lower() == ADMIN_EMAIL.lower()
@@ -93,12 +112,13 @@ def _set_feature_flag(supabase, feature_key: str, enabled: bool) -> bool:
     flags[feature_key] = enabled
     return _save_config(supabase, "_feature_flags", flags)
 
-def render_admin_assistant_page(supabase, groq_client) -> None:
+def render_admin_assistant_page(supabase, groq_client=None) -> None:
     st.subheader("🛠️ Admin Control Assistant")
-    st.caption("Sirf admin ke liye active.")
+    st.caption("Sirf admin ke liye active (Powered by Gemini).")
 
-    if not groq_client:
-        st.error("🚨 GROQ_API_KEY set nahi hai.")
+    client = get_gemini_client()
+    if not client:
+        st.error("🚨 GEMINI_API_KEY set nahi hai.")
         return
 
     if "admin_chat_messages" not in st.session_state:
@@ -136,18 +156,17 @@ def render_admin_assistant_page(supabase, groq_client) -> None:
             st.write(prompt)
 
         try:
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            contents = [SYSTEM_PROMPT]
             for m in st.session_state.admin_chat_messages[-10:]:
-                messages.append({"role": m["role"], "content": m["content"]})
+                role_prefix = "User: " if m["role"] == "user" else "Model: "
+                contents.append(role_prefix + m["content"])
 
-            # Using latest active groq model matching script module stability
-            response = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=messages,
-                max_tokens=500,
-                temperature=0.3,
+            response = client.models.generate_content(
+                model=GEMINI_MODEL_NAME,
+                contents="\n\n".join(contents),
+                config={"temperature": 0.3, "max_output_tokens": 500}
             )
-            raw = response.choices[0].message.content.strip()
+            raw = response.text.strip()
             
             match = re.search(r"\{.*\}", raw, re.DOTALL)
             if match:
