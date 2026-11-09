@@ -8,6 +8,7 @@ import os
 import base64
 import time
 import urllib.parse
+from datetime import datetime
 from io import BytesIO
 
 import requests
@@ -76,7 +77,8 @@ def generate_with_huggingface(prompt: str, negative_prompt: str, model_id: str, 
 def build_pollinations_url(prompt: str, neg_prompt: str, width: int, height: int, seed: int) -> str:
     encoded_prompt = urllib.parse.quote(prompt)
     encoded_neg = urllib.parse.quote(neg_prompt)
-    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=flux&nologo=true&negative={encoded_neg}"
+    # nologo=true ensures watermark is removed from the corner
+    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&seed={seed}&model=flux&nologo=true&private=true&enhance=false&negative={encoded_neg}"
 
 def render_image_page(supabase=None, user=None):
     st.subheader("🎨 Automated Storybook & YouTube Thumbnail Studio")
@@ -87,10 +89,10 @@ def render_image_page(supabase=None, user=None):
     
     st.caption(f"🤖 Nano Banana Status: {'✅ Active' if gemini_active else '⚠️ Inactive'}")
     st.caption(f"🧠 Hugging Face Status: {'✅ Active' if hf_active else '⚠️ Inactive (Optional)'}")
-    st.caption("🆓 Pollinations Status: ✅ Always Available (Zero-Failure Backup)")
+    st.caption("🆓 Pollinations Status: ✅ Always Available (Watermark Free)")
 
     img_prompt = st.text_area("✨ Prompt Box (मुख्य विवरण):", placeholder="90s Studio Ghibli style anime scene...")
-    neg_prompt = st.text_area("🚫 Negative Prompt:", value="blurry, distorted face, low quality, bad anatomy")
+    neg_prompt = st.text_area("🚫 Negative Prompt:", value="blurry, distorted face, low quality, bad anatomy, watermark, logo")
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -138,7 +140,7 @@ def render_image_page(supabase=None, user=None):
                     else:
                         err_log.append(f"HF: {err}")
 
-                # Step 3: Ultimate Fallback to Pollinations (Never Fails)
+                # Step 3: Ultimate Fallback to Pollinations (Watermark Free)
                 if not img_bytes:
                     seed_val = int(time.time()) + i
                     url = build_pollinations_url(final_prompt, neg_prompt, w, h, seed_val)
@@ -146,7 +148,7 @@ def render_image_page(supabase=None, user=None):
                         resp = requests.get(url, timeout=60)
                         if resp.status_code == 200 and len(resp.content) > 1000:
                             img_bytes = resp.content
-                            used_provider = "Pollinations (Free Backup)"
+                            used_provider = "Pollinations (Watermark Free)"
                     except Exception as e:
                         err_log.append(f"Pollinations: {str(e)}")
 
