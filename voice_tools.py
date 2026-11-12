@@ -57,9 +57,9 @@ def generate_elevenlabs_audio(text, voice_id, output_file):
         "text": text,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.45,         # Natural emotional variation aur breath/pauses ke liye balanced stability
-            "similarity_boost": 0.80,   # Voice clarity aur character consistency ke liye
-            "style": 0.20,              # Expressive style boost
+            "stability": 0.45,
+            "similarity_boost": 0.80,
+            "style": 0.20,
             "use_speaker_boost": True
         }
     }
@@ -86,7 +86,6 @@ def clone_voice_to_elevenlabs(name, file_path):
     return None
 
 def get_elevenlabs_voices():
-    # प्रो लेवल और नेचुरल कैरेक्टर्स: महिला, पुरुष, दादाजी, दादी/अम्मा, बच्चा, विलेन और भूतिया आवाज़ों के लिए विस्तृत IDs
     fallback_voices = {
         " Rachel (Professional Female - मुख्य महिला)": "21m00Tcm4TlvDq8ikWAM",
         " Dom (Deep Calm Male - गंभीर पुरुष)": "AZnzlk1XvdvUeBnXmlld",
@@ -115,13 +114,16 @@ def get_elevenlabs_voices():
     return fallback_voices
 
 def render_voice_page():
-    str_lit.subheader("🎙️ AI Master Voice & Professional Studio (Pro Version)")
-    str_lit.write("यहाँ हर कैरेक्टर के लिए बिल्कुल अलग और सटीक न्यूरल आवाज़ें, वॉइस प्रीव्यू और क्लोनिंग की सुविधा उपलब्ध है:")
+    str_lit.subheader("🎙️ AI Master Voice & Professional Studio (Pro & Free Hybrid)")
+    str_lit.write("यहाँ ElevenLabs प्रीमियम और Free Unlimited (Edge-TTS) दोनों इंजन उपलब्ध हैं। यदि ElevenLabs क्रेडिट खत्म हो जाए, तो फ्री इंजन का उपयोग करें:")
 
-    # --- ENGINE SELECTION (Free vs ElevenLabs) ---
+    # --- DUAL ENGINE SELECTION (ElevenLabs vs Free Edge-TTS) ---
     voice_engine_choice = str_lit.radio(
         "🎛️ वॉइस इंजन चुनें (Select Voice Engine):",
-        ["🔥 ElevenLabs Premium & Cloned Voices (प्रोफेशनल और नेचुरल)", "🆓 Free Built-in Studio Voices (अनलिमिटेड फ्री)"],
+        [
+            "🔥 ElevenLabs Premium Voices (प्रोफेशनल और नेचुरल)", 
+            "🆓 Free Built-in Studio Voices (अनलिमिटेड फ्री बैकअप)"
+        ],
         horizontal=True
     )
 
@@ -221,30 +223,32 @@ def render_voice_page():
             pass
 
         if not voice_profiles_map:
-            voice_profiles_map["⚠️ No ElevenLabs Voice Found"] = {
-                "type": "edge", "voice": current_lang_voices["male_deep"], "pitch": "+0Hz", "rate": "+0%", "sample_text": "कोई आवाज़ नहीं मिली।"
+            str_lit.warning("⚠️ ElevenLabs API से कनेक्ट नहीं हो पाया या क्रेडिट खत्म हो गया है। कृपया नीचे दिए गए 'Free Built-in Studio Voices' इंजन पर स्विच करें।")
+            voice_profiles_map["⚠️ Fallback to Free Voice"] = {
+                "type": "edge", "voice": current_lang_voices["female"], "pitch": "+0Hz", "rate": "+0%", "sample_text": "फ्री इंजन एक्टिव किया गया है।"
             }
     else:
+        # फ्री अनलमिटेड एज-टीएस (Edge-TTS) प्रोफाइल्स
         voice_profiles_map = {
-            f"1. 🇮🇳 {selected_language} - Swara (मुख्य नेचुरल महिला आवाज़)": {
-                "type": "edge", "voice": current_lang_voices["female"], "pitch": "+0Hz", "rate": "+0%", "sample_text": "नमस्ते, यह मेरी प्राकृतिक महिला आवाज़ का सैंपल है।"
+            f"1. 🇮🇳 {selected_language} - Swara (मुख्य नेचुरल महिला आवाज़ - Free)": {
+                "type": "edge", "voice": current_lang_voices["female"], "pitch": "+0Hz", "rate": "+0%", "sample_text": "नमस्ते, यह मेरी प्राकृतिक महिला आवाज़ का फ्री सैंपल है।"
             },
-            f"2. 🇮🇳 {selected_language} - Madhur (गंभीर और भारी पुरुष आवाज़)": {
+            f"2. 🇮🇳 {selected_language} - Madhur (गंभीर और भारी पुरुष आवाज़ - Free)": {
                 "type": "edge", "voice": current_lang_voices["male_deep"], "pitch": "-5Hz", "rate": "-5%", "sample_text": "नमस्कार, यह एक गंभीर और भारी पुरुष आवाज़ है।"
             },
-            f"3. 🇮🇳 {selected_language} - Prabhat (तेज़ और जोशीली पुरुष आवाज़)": {
+            f"3. 🇮🇳 {selected_language} - Prabhat (तेज़ और जोशीली पुरुष आवाज़ - Free)": {
                 "type": "edge", "voice": current_lang_voices["male_energetic"], "pitch": "+4Hz", "rate": "+10%", "sample_text": "नमस्ते दोस्तों, यह एक जोशीली और एनर्जेटिक आवाज़ है!"
             },
-            "4. 👻 Horror Ghost (डरावनी भूतिया भारी आवाज़)": {
+            "4. 👻 Horror Ghost (डरावनी भूतिया भारी आवाज़ - Free)": {
                 "type": "edge", "voice": "en-GB-RyanNeural", "pitch": "-12Hz", "rate": "-20%", "sample_text": "This is a dark horror ghost voice speaking from the shadows."
             },
-            "5. 👵 Old Village Woman (बूढ़ी औरत की खुरदरी भारी आवाज़)": {
+            "5. 👵 Old Village Woman (बूढ़ी औरत की खुरदरी भारी आवाज़ - Free)": {
                 "type": "edge", "voice": "en-US-AriaNeural", "pitch": "-8Hz", "rate": "-15%", "sample_text": "Beta, sun rahe ho meri purani kahani?"
             },
-            "6. 👴 Old Wise Grandfather (बुजुर्ग और समझदार दादाजी)": {
+            "6. 👴 Old Wise Grandfather (बुजुर्ग और समझदार दादाजी - Free)": {
                 "type": "edge", "voice": "en-US-AndrewNeural", "pitch": "-7Hz", "rate": "-10%", "sample_text": "Waqt sabse bada sikandar hota hai mere bachhe."
             },
-            "7. 🧛 Evil Villain / Monster (खतरनाक खलनायक की आवाज़)": {
+            "7. 🧛 Evil Villain / Monster (खतरनाक खलनायक की आवाज़ - Free)": {
                 "type": "edge", "voice": "en-US-ChristopherNeural", "pitch": "-10Hz", "rate": "-8%", "sample_text": "You cannot escape from my trap now!"
             }
         }
@@ -296,7 +300,13 @@ def render_voice_page():
                     filename = f"master_audio_{timestamp}.mp3"
 
                     if config["type"] == "elevenlabs":
-                        generate_elevenlabs_audio(audio_text, config["voice_id"], filename)
+                        try:
+                            generate_elevenlabs_audio(audio_text, config["voice_id"], filename)
+                        except Exception as el_err:
+                            str_lit.warning(f"⚠️ ElevenLabs फेल हो गया ({el_err}), ऑटोमैटिकली फ्री (Edge-TTS) इंजन से जनरेट किया जा रहा है...")
+                            # ऑटोमैटिक फॉलबैक फ्री इंजन पर
+                            fallback_voice = current_lang_voices["female"]
+                            run_async(generate_edge_audio_with_emotion(audio_text, fallback_voice, filename, rate_str="+0%", pitch_str="+0Hz", emotion=audio_emotion))
                     else:
                         voice_id = config["voice"]
                         base_rate_num = int(config["rate"].replace("+", "").replace("%", ""))
