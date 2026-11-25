@@ -13,6 +13,7 @@ from script_gen import render_script_page
 from image_gen import render_image_page
 from video_gen import render_video_page
 from voice_tools import render_voice_page
+from auto_studio import render_auto_studio_page
 from auth_pro import get_supabase_client, restore_session, render_auth_ui, render_account_menu
 from settings_pro import render_settings_page
 from admin_assistant_pro import is_admin, get_config, is_feature_enabled, render_admin_assistant_page, FEATURE_KEYS
@@ -92,6 +93,7 @@ for flag_key, label in FEATURE_KEYS.items():
     elif admin_user:
         pages.append(f"🚧 {label}")
 
+pages.append("🎬 Auto Studio")
 pages.append("💎 Upgrade to Pro")
 if admin_user:
     pages.append("🧾 Pending Payments")
@@ -144,9 +146,13 @@ if st.session_state.current_page == "🏠 Dashboard":
             st.session_state.current_page = "🎬 Image to Video"
             st.rerun()
     with col6:
-        if st.button("⚙️ Open Settings", use_container_width=True):
-            st.session_state.current_page = "⚙️ Settings"
+        if st.button("✂️ Open Auto Studio (Editor)", use_container_width=True):
+            st.session_state.current_page = "🎬 Auto Studio"
             st.rerun()
+
+    if st.button("⚙️ Open Settings", use_container_width=True):
+        st.session_state.current_page = "⚙️ Settings"
+        st.rerun()
 
 elif st.session_state.current_page in ("💬 AI Chatbot", "🚧 💬 AI Chatbot"):
     if st.session_state.current_page.startswith("🚧"):
@@ -208,6 +214,9 @@ elif st.session_state.current_page in ("🎬 Image to Video", "🚧 🎬 Image t
     if st.session_state.current_page.startswith("🚧"):
         st.warning(get_config(supabase, "maintenance_message", "🚧 Ye feature abhi maintenance mode mein hai."))
     render_video_page()
+
+elif st.session_state.current_page == "🎬 Auto Studio":
+    render_auto_studio_page(supabase, st.session_state.get("user"))
 
 elif st.session_state.current_page == "💎 Upgrade to Pro":
     st.subheader("💎 Upgrade to Pro")
