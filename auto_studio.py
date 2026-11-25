@@ -20,9 +20,6 @@ def _get_gemini_client():
 
 
 def generate_viral_story_package(niche_prompt: str, num_scenes: int = 4) -> dict:
-    """
-    Viral topic, Hindi story scenes, image prompts, aur YouTube metadata generate karta hai.
-    """
     client = _get_gemini_client()
     if not client:
         raise RuntimeError("GEMINI_API_KEY set nahi hai.")
@@ -68,49 +65,67 @@ def render_auto_studio_page(supabase=None, user=None):
     with tab_edit:
         st.markdown("### Scenes Ki Image Aur Voice Ko Jodkar MP4 Banayein")
         scene_count = st.number_input("Kitne scenes jodne hain?", min_value=1, max_value=10, value=2, step=1)
-        scenes_input = []
+        scene_pairs = []
+        missing_scenes = []
 
         for idx in range(int(scene_count)):
             st.markdown(f"**Scene {idx + 1}**")
             c1, c2 = st.columns(2)
             with c1:
-                img_file = st.file_uploader(f"Scene {idx + 1} Image (PNG/JPG)", type=["png", "jpg", "jpeg"], key=f"ve_img_{idx}")
+                img_file = st.file_uploader(
+                    f"Scene {idx + 1} Image (PNG/JPG)",
+                    type=["png", "jpg", "jpeg", "webp"],
+                    key=f"ve_img_{idx}",
+                )
             with c2:
-                aud_file = st.file_uploader(f"Scene {idx + 1} Voiceover (MP3/WAV)", type=["mp3", "wav"], key=f"ve_aud_{idx}")
+                aud_file = st.file_uploader(
+                    f"Scene {idx + 1} Voiceover (MP3/WAV/M4A)",
+                    type=["mp3", "wav", "m4a", "ogg"],
+                    key=f"ve_aud_{idx}",
+                )
 
-            if img_file and aud_file:
-                scenes_input.append((img_file, aud_file))
+            if img_file is not None and aud_file is not None:
+                scene_pairs.append((img_file, aud_file))
+            else:
+                missing_scenes.append(idx + 1)
 
         if st.button("🎞️ Render Final MP4 Video", type="primary", use_container_width=True):
-            if len(scenes_input) != int(scene_count):
-                st.warning("Har scene ke liye image aur audio dono upload karein.")
+            if missing_scenes:
+                st.warning(f"In scenes mein image ya audio baaki hai: Scene {', '.join(map(str, missing_scenes))}")
                 return
 
             with st.spinner("Video render ho raha hai... Kripya pratiksha karein"):
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    prepared_scenes = []
-                    for i, (img_f, aud_f) in enumerate(scenes_input):
-                        img_path = os.path.join(tmpdir, f"scene_{i}_{img_f.name}")
-                        aud_path = os.path.join(tmpdir, f"scene_{i}_{aud_f.name}")
-                        with open(img_path, "wb") as f:
-                            f.write(img_f.getvalue())
-                        with open(aud_path, "wb") as f:
-                            f.write(aud_f.getvalue())
-                        prepared_scenes.append({"image": img_path, "audio": aud_path})
+                try:
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        prepared_scenes = []
+                        for i, (img_f, aud_f) in enumerate(scene_pairs):
+                            img_ext = os.path.splitext(img_f.name)[1] or ".png"
+                            aud_ext = os.path.splitext(aud_f.name)[1] or ".mp3"
+                            img_path = os.path.join(tmpdir, f"scene_{i}{img_ext}")
+                            aud_path = os.path.join(tmpdir, f"scene_{i}{aud_ext}")
 
-                    out_mp4 = os.path.join(tmpdir, "final_story_video.mp4")
-                    create_story_video(prepared_scenes, out_mp4)
-                    with open(out_mp4, "rb") as f:
-                        mp4_bytes = f.read()
+                            with open(img_path, "wb") as f:
+                                f.write(img_f.getvalue())
+                            with open(aud_path, "wb") as f:
+                                f.write(aud_f.getvalue())
 
-                st.success("MP4 video taiyar ho gaya!")
-                st.video(mp4_bytes)
-                st.download_button(
-                    label="📥 Download MP4 Video",
-                    data=mp4_bytes,
-                    file_name="final_story_video.mp4",
-                    mime="video/mp4",
-                )
+                            prepared_scenes.append({"image": img_path, "audio": aud_path})
+
+                        out_mp4 = os.path.join(tmpdir, "final_story_video.mp4")
+                        create_story_video(prepared_scenes, out_mp4)
+                        with open(out_mp4, "rb") as f:
+                            mp4_bytes = f.read()
+
+                    st.success("MP4 video taiyar ho gaya!")
+                    st.video(mp4_bytes)
+                    st.download_button(
+                        label="📥 Download MP4 Video",
+                        data=mp4_bytes,
+                        file_name="final_story_video.mp4",
+                        mime="video/mp4",
+                    )
+                except Exception as e:
+                    st.error(f"Video render error: {e}")
 
     with tab_autopilot:
         st.markdown("### Viral Topic, Script & Scene Plan Generator")
